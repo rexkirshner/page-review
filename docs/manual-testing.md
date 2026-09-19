@@ -27,7 +27,8 @@ Build the extension, load `dist` as an unpacked extension, and serve the fixture
 
 ## Resolution and retention
 
-- [ ] Annotate the dynamic target, reload, then use **Replace target** before restoring a suitable changed-page draft. Confirm an uncertain target is reported as unresolved rather than attached elsewhere.
+- [ ] Select only the initial sentence in the dynamic target and save it. Turn feedback mode off, choose **Replace target**, then turn feedback mode on again. Confirm the original comment is retained and reported as unresolved rather than attached to the replacement text.
+- [ ] Annotate the replacement sentence, turn feedback mode off, choose **Remove target**, then turn feedback mode on again. Confirm both earlier comments remain in the draft and both targets are unresolved.
 - [ ] Annotate one of the duplicate-text paragraphs, change the DOM path, and confirm the duplicate quote is not used as an ambiguous fallback.
 - [ ] Temporarily seed or edit a draft's `lastEditedAt` in extension storage to exceed the chosen retention period. Load it and confirm the draft and its images are deleted.
 - [ ] Choose 7, 30, 90 days, and never; reload after each and confirm the setting persists.
