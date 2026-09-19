@@ -8,6 +8,7 @@ import {
   setDraftAnnotationResolution,
   setDraftAnnotationScreenshot,
 } from "../src/core/draft";
+import { userFacingError } from "../src/core/errors";
 import { buildZip, exportJson, exportMarkdown } from "../src/core/export";
 import { buildCssPath, cssEscape, looksStable, scoreElementCandidate } from "../src/core/locator";
 import { readDraft } from "../src/core/migrations";
@@ -131,6 +132,15 @@ test("settings accept only supported retention values and return independent def
   const first = normalizeSettings(undefined);
   first.retentionDays = 90;
   assert.deepEqual(normalizeSettings(undefined), { retentionDays: 7 });
+});
+
+test("extension reload errors tell the user how to recover", () => {
+  assert.equal(
+    userFacingError(new Error("Extension context invalidated."), "The action failed."),
+    "The extension was reloaded. Refresh this page and turn feedback mode on again.",
+  );
+  assert.equal(userFacingError(new Error("Storage failed."), "The action failed."), "Storage failed.");
+  assert.equal(userFacingError(undefined, "The action failed."), "The action failed.");
 });
 
 test("screenshot target rectangles scale and clip to the visible viewport", () => {

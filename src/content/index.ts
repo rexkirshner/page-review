@@ -6,6 +6,7 @@ import {
   setDraftAnnotationResolution,
   setDraftAnnotationScreenshot,
 } from "../core/draft";
+import { userFacingError } from "../core/errors";
 import type { Annotation, Draft, PageContext, Rect, Settings, TargetEvidence } from "../core/model";
 import { pageKey } from "../core/page-key";
 import { deduplicateRects } from "../core/screenshot-geometry";
@@ -313,7 +314,7 @@ class FeedbackController {
       pending.screenshot = screenshot;
     } catch (error) {
       if (!this.active || this.pending !== pending) return;
-      pending.screenshotError = error instanceof Error ? error.message : "Screenshot capture failed.";
+      pending.screenshotError = userFacingError(error, "Screenshot capture failed.");
     }
     if (!this.active || this.pending !== pending) return;
     this.status = "";
@@ -384,7 +385,7 @@ class FeedbackController {
             height: pending.screenshot.height,
           };
         } catch (error) {
-          return this.setStatus(error instanceof Error ? error.message : "Screenshot storage failed.", true);
+          return this.setStatus(userFacingError(error, "Screenshot storage failed."), true);
         }
       }
       const nextDraft = appendDraftAnnotation(this.draft, annotation);
@@ -477,7 +478,7 @@ class FeedbackController {
       this.draft = nextDraft;
       this.setStatus("Screenshot captured.");
     } catch (error) {
-      this.setStatus(error instanceof Error ? error.message : "Screenshot capture failed.", true);
+      this.setStatus(userFacingError(error, "Screenshot capture failed."), true);
     }
   }
 
@@ -569,11 +570,11 @@ class FeedbackController {
     panel.setAttribute("aria-label", "Feedback Packet");
     panel.innerHTML = this.panelHtml();
     panel.addEventListener("click", (event) => void this.handlePanelClick(event).catch((error) => {
-      this.setStatus(error instanceof Error ? error.message : "The action failed.", true);
+      this.setStatus(userFacingError(error, "The action failed."), true);
     }));
     panel.addEventListener("input", (event) => this.handlePanelInput(event));
     panel.addEventListener("change", (event) => void this.handlePanelChange(event).catch((error) => {
-      this.setStatus(error instanceof Error ? error.message : "The setting could not be saved.", true);
+      this.setStatus(userFacingError(error, "The setting could not be saved."), true);
     }));
     this.root.append(panel);
     this.renderMarkers();
