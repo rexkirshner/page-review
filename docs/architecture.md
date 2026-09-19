@@ -24,6 +24,8 @@ The service worker in `src/background/index.ts` has only three jobs: inject feed
 6. Draft JSON is written through `chrome.storage.local`. Attached PNG blobs are written through the service worker to IndexedDB under `<draft-id>:<annotation-id>`.
 7. Export is generated from captured evidence only. The page is never re-scraped at export time.
 
+Full page loads remove the content script. While feedback mode is active, the content script also watches the URL so hash changes and client-side history navigation turn the mode off without requiring persistent navigation permissions.
+
 ## Page identity and retention
 
 The page key is `origin + path + query + hash`. `utm_*`, `fbclid`, and `gclid` are the complete tracking-parameter strip list; it is exported as `TRACKING_PARAMS` in `src/core/page-key.ts`. Parameter order is preserved. Any other query or hash difference creates a distinct draft.

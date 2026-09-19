@@ -18,6 +18,7 @@ Build the extension, load `dist` as an unpacked extension, and serve the fixture
 
 - [ ] Click the toolbar action while feedback mode is on. Confirm the panel and every marker disappear and ordinary page clicks work.
 - [ ] Turn feedback mode on again without reloading. Confirm the draft returns.
+- [ ] Follow a hash route or trigger client-side history navigation. Confirm feedback mode turns off; turn it on again and confirm the destination page key's draft loads.
 - [ ] Refresh. Confirm feedback mode is off; click the action and confirm the draft returns.
 - [ ] Restart Chrome, reopen the same URL, turn feedback mode on, and confirm the draft returns.
 - [ ] Create drafts at `#overview` and `#details`; confirm they remain distinct.

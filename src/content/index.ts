@@ -94,6 +94,8 @@ class FeedbackController {
   private editorComment = "";
   private attachScreenshot = false;
   private exportFormat: "md" | "json" = "md";
+  private activatedUrl = "";
+  private navigationTimer: number | undefined;
 
   async toggle(): Promise<void> {
     if (this.active) this.deactivate();
@@ -102,6 +104,7 @@ class FeedbackController {
 
   private async activate(): Promise<void> {
     this.active = true;
+    this.activatedUrl = location.href;
     this.settings = await loadSettings();
     const key = pageKey(location.href);
     const result = await loadDraft(key, this.settings);
@@ -167,6 +170,9 @@ class FeedbackController {
     document.addEventListener("keydown", this.onKeyDown, true);
     window.addEventListener("scroll", this.onViewportChange, true);
     window.addEventListener("resize", this.onViewportChange);
+    window.addEventListener("hashchange", this.onNavigation);
+    window.addEventListener("popstate", this.onNavigation);
+    this.navigationTimer = window.setInterval(this.onNavigation, 500);
   }
 
   private removeListeners(): void {
@@ -175,6 +181,10 @@ class FeedbackController {
     document.removeEventListener("keydown", this.onKeyDown, true);
     window.removeEventListener("scroll", this.onViewportChange, true);
     window.removeEventListener("resize", this.onViewportChange);
+    window.removeEventListener("hashchange", this.onNavigation);
+    window.removeEventListener("popstate", this.onNavigation);
+    if (this.navigationTimer !== undefined) window.clearInterval(this.navigationTimer);
+    this.navigationTimer = undefined;
     cancelAnimationFrame(this.markerFrame);
   }
 
@@ -208,6 +218,10 @@ class FeedbackController {
   private onViewportChange = (): void => {
     cancelAnimationFrame(this.markerFrame);
     this.markerFrame = requestAnimationFrame(() => this.renderMarkers());
+  };
+
+  private onNavigation = (): void => {
+    if (this.active && location.href !== this.activatedUrl) this.deactivate();
   };
 
   private async capture(target: LocatedTarget | undefined): Promise<CapturedScreenshot> {
