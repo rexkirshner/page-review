@@ -11,6 +11,7 @@ export const styles = String.raw`
   button, textarea, select { font: inherit; }
   .fp-panel {
     position: fixed;
+    z-index: 1;
     top: 16px;
     right: 16px;
     width: min(370px, calc(100vw - 32px));
