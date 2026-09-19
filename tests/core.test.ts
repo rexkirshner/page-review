@@ -244,6 +244,18 @@ test("Markdown and JSON exports carry equivalent comments, evidence, and version
   assert.equal(json.annotations[0].target.exactQuote, "text across inline elements");
 });
 
+test("Markdown escapes evidence whitespace that would break a list item", () => {
+  const draft = sampleDraft();
+  const target = draft.annotations[0].target;
+  if (!target || target.kind !== "text") throw new Error("Expected text target");
+  target.exactQuote = "labels\n  Duplicate";
+  target.before = "\n  Repeated ";
+
+  const markdown = exportMarkdown(draft, now);
+  assert.ok(markdown.includes('- Exact quote: "labels\\n  Duplicate"'));
+  assert.ok(markdown.includes('- Before: "\\n  Repeated "'));
+});
+
 test("ZIP export contains the feedback file and referenced PNG", () => {
   const bytes = new Uint8Array([137, 80, 78, 71]);
   const zip = unzipSync(buildZip("feedback.md", "# Feedback\n", { "annotation-1.png": bytes }));

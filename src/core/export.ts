@@ -16,7 +16,10 @@ export function toFeedbackExport(draft: Draft, exportedAt: string): FeedbackExpo
 }
 
 function line(label: string, value: unknown): string {
-  return `- ${label}: ${typeof value === "string" ? value : JSON.stringify(value)}`;
+  const plainString = typeof value === "string"
+    && value.trim() === value
+    && !/[\r\n\t]/.test(value);
+  return `- ${label}: ${plainString ? value : JSON.stringify(value)}`;
 }
 
 function evidenceLines(annotation: Annotation): string[] {
