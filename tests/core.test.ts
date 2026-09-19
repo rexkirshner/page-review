@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { strFromU8, unzipSync } from "fflate";
 import { buildZip, exportJson, exportMarkdown } from "../src/core/export";
-import { buildCssPath, looksStable, scoreElementCandidate } from "../src/core/locator";
+import { buildCssPath, cssEscape, looksStable, scoreElementCandidate } from "../src/core/locator";
 import { readDraft } from "../src/core/migrations";
 import { DRAFT_SCHEMA_VERSION, type Draft } from "../src/core/model";
 import { pageKey, TRACKING_PARAMS } from "../src/core/page-key";
@@ -97,6 +97,13 @@ test("locator helpers keep stable identifiers and score complementary evidence",
   assert.equal(scoreElementCandidate(expected, expected), 1);
   assert.ok(scoreElementCandidate(expected, { ...expected, id: "other", text: "Submit" }) < 0.7);
   assert.equal(scoreElementCandidate(expected, { ...expected, tag: "a" }), 0);
+});
+
+test("CSS locator escaping handles identifiers that are valid HTML but need CSS escapes", () => {
+  assert.equal(cssEscape("1 item"), "\\31 \\ item");
+  assert.equal(cssEscape("-1item"), "-\\31 item");
+  assert.equal(cssEscape("a:b"), "a\\:b");
+  assert.equal(cssEscape("\0name"), "\uFFFDname");
 });
 
 test("retention expires from last edit and supports never", () => {

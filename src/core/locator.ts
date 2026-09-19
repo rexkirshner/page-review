@@ -21,10 +21,25 @@ export function looksStable(value: string): boolean {
 }
 
 export function cssEscape(value: string): string {
-  return value.replace(/(^-?\d)|[^a-zA-Z0-9_-]/g, (match, leadingDigit) => {
-    if (leadingDigit) return `\\3${leadingDigit} `;
-    return `\\${match}`;
-  });
+  if (value === "-") return "\\-";
+  let escaped = "";
+  for (let index = 0; index < value.length; index += 1) {
+    const character = value[index];
+    const code = value.charCodeAt(index);
+    if (code === 0) {
+      escaped += "\uFFFD";
+    } else if ((code >= 1 && code <= 31) || code === 127
+      || (index === 0 && code >= 48 && code <= 57)
+      || (index === 1 && code >= 48 && code <= 57 && value[0] === "-")) {
+      escaped += `\\${code.toString(16)} `;
+    } else if (code >= 128 || character === "-" || character === "_"
+      || (code >= 48 && code <= 57) || (code >= 65 && code <= 90) || (code >= 97 && code <= 122)) {
+      escaped += character;
+    } else {
+      escaped += `\\${character}`;
+    }
+  }
+  return escaped;
 }
 
 export function buildCssPath(segments: PathSegment[]): string {
