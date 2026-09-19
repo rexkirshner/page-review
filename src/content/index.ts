@@ -179,7 +179,11 @@ class FeedbackController {
     if (!this.selectingElement || this.host?.contains(event.target as Node)) return;
     this.pointer = { x: event.clientX, y: event.clientY };
     const target = document.elementFromPoint(event.clientX, event.clientY);
-    if (target && target !== this.host) { this.candidate = target; this.renderMarkers(); }
+    if (target && target !== this.host) {
+      this.candidate = target;
+      this.renderMarkers();
+      this.updateSelectionControls();
+    }
   };
 
   private onDocumentClick = (event: MouseEvent): void => {
@@ -259,6 +263,7 @@ class FeedbackController {
     if (this.candidate?.parentElement && this.candidate.parentElement !== document.documentElement) {
       this.candidate = this.candidate.parentElement;
       this.renderMarkers();
+      this.updateSelectionControls();
     }
   }
 
@@ -268,6 +273,14 @@ class FeedbackController {
     if (hit && hit !== this.candidate && this.candidate.contains(hit)) this.candidate = hit;
     else if (this.candidate.firstElementChild) this.candidate = this.candidate.firstElementChild;
     this.renderMarkers();
+    this.updateSelectionControls();
+  }
+
+  private updateSelectionControls(): void {
+    const parent = this.root?.querySelector<HTMLButtonElement>('button[data-action="parent"]');
+    const child = this.root?.querySelector<HTMLButtonElement>('button[data-action="child"]');
+    if (parent) parent.disabled = !this.candidate?.parentElement || this.candidate.parentElement === document.documentElement;
+    if (child) child.disabled = !this.candidate?.firstElementChild;
   }
 
   private async saveEditor(): Promise<void> {
