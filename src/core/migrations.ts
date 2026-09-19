@@ -66,7 +66,8 @@ function isTarget(value: unknown): boolean {
     return isElementSummary(value) && Array.isArray(value.ancestors)
       && value.ancestors.every(isElementSummary) && isRect(value.rect);
   }
-  return typeof value.exactQuote === "string" && typeof value.before === "string" && typeof value.after === "string"
+  return typeof value.exactQuote === "string" && value.exactQuote.trim().length > 0
+    && typeof value.before === "string" && typeof value.after === "string"
     && isOptionalString(value.sectionContext)
     && isObject(value.range) && isObject(value.range.startContainer) && Array.isArray(value.range.startContainer.indexes)
     && value.range.startContainer.indexes.every(isNonNegativeInteger) && isNonNegativeInteger(value.range.startOffset)
@@ -80,7 +81,7 @@ function isTarget(value: unknown): boolean {
 function isAnnotation(value: unknown): boolean {
   if (!isObject(value)) return false;
   const type = String(value.type);
-  return typeof value.id === "string" && typeof value.comment === "string"
+  return typeof value.id === "string" && value.id.length > 0 && typeof value.comment === "string"
     && ["page", "text", "element"].includes(type)
     && isTimestamp(value.createdAt) && isTimestamp(value.updatedAt)
     && (value.resolution === "resolved" || value.resolution === "unresolved")
@@ -89,19 +90,25 @@ function isAnnotation(value: unknown): boolean {
       ? value.target === undefined
       : isObject(value.target) && value.target.kind === type && isTarget(value.target))
     && (value.screenshot === undefined || (isObject(value.screenshot)
-      && typeof value.screenshot.filename === "string" && isTimestamp(value.screenshot.capturedAt)
+      && value.screenshot.filename === `${value.id}.png` && isTimestamp(value.screenshot.capturedAt)
       && isPositiveNumber(value.screenshot.width) && isPositiveNumber(value.screenshot.height)));
+}
+
+function hasUniqueAnnotationIds(annotations: unknown[]): boolean {
+  const ids = annotations.map((annotation) => isObject(annotation) ? annotation.id : undefined);
+  return new Set(ids).size === ids.length;
 }
 
 function validV1(value: unknown): value is Draft {
   if (!isObject(value)) return false;
   return value.schemaVersion === DRAFT_SCHEMA_VERSION
-    && typeof value.id === "string"
-    && typeof value.pageKey === "string"
+    && typeof value.id === "string" && value.id.length > 0
+    && typeof value.pageKey === "string" && value.pageKey.length > 0
     && isTimestamp(value.createdAt)
     && isTimestamp(value.lastEditedAt)
     && Array.isArray(value.annotations)
-    && value.annotations.every(isAnnotation);
+    && value.annotations.every(isAnnotation)
+    && hasUniqueAnnotationIds(value.annotations);
 }
 
 function migrateV0(value: LegacyDraftV0): Draft {

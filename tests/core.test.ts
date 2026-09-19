@@ -214,6 +214,24 @@ test("draft migration handles v0 and rejects corrupt or future drafts", () => {
       },
     }],
   }).status, "corrupt");
+  assert.equal(readDraft({
+    ...draft,
+    annotations: [{
+      ...draft.annotations[0],
+      target: { ...draft.annotations[0].target, exactQuote: "" },
+    }],
+  }).status, "corrupt");
+  assert.equal(readDraft({
+    ...draft,
+    annotations: [draft.annotations[0], { ...draft.annotations[0] }],
+  }).status, "corrupt");
+  assert.equal(readDraft({
+    ...draft,
+    annotations: [{
+      ...draft.annotations[0],
+      screenshot: { ...draft.annotations[0].screenshot!, filename: "../feedback.md" },
+    }],
+  }).status, "corrupt");
   assert.equal(readDraft({ schemaVersion: 99 }).status, "unsupported");
   assert.equal(readDraft(undefined).status, "missing");
 });
