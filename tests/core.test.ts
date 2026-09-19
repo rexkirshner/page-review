@@ -122,6 +122,7 @@ test("draft migration handles v0 and rejects corrupt or future drafts", () => {
   }
 
   assert.equal(readDraft("bad").status, "corrupt");
+  assert.equal(readDraft({ ...draft, annotations: [{ id: "broken", type: "text", comment: "Missing evidence" }] }).status, "corrupt");
   assert.equal(readDraft({ schemaVersion: 99 }).status, "unsupported");
   assert.equal(readDraft(undefined).status, "missing");
 });

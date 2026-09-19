@@ -41,6 +41,11 @@ export async function clearDraft(draft: Draft): Promise<void> {
   await deleteDraftScreenshots(draft.id);
 }
 
+export async function clearStoredDraft(key: string, storedDraftId?: string): Promise<void> {
+  await chrome.storage.local.remove(draftKey(key));
+  if (storedDraftId) await deleteDraftScreenshots(storedDraftId);
+}
+
 export function createDraft(key: string, now = new Date().toISOString()): Draft {
   return {
     schemaVersion: DRAFT_SCHEMA_VERSION,

@@ -2,7 +2,7 @@ import { buildZip, exportJson, exportMarkdown } from "../core/export";
 import type { Annotation, Draft, ElementEvidence, PageContext, Rect, Settings, TargetEvidence } from "../core/model";
 import { pageKey } from "../core/page-key";
 import { captureElementEvidence, capturePageContext, captureTextEvidence, locateElement, locateText } from "../browser/dom-evidence";
-import { clearDraft, createDraft, loadDraft, loadSettings, saveDraft, saveSettings } from "../browser/persistence";
+import { clearDraft, clearStoredDraft, createDraft, loadDraft, loadSettings, saveDraft, saveSettings } from "../browser/persistence";
 import { captureVisibleScreenshot, deleteScreenshot, getScreenshot, putScreenshot } from "../browser/screenshot";
 import { styles } from "./styles";
 
@@ -89,6 +89,8 @@ class FeedbackController {
   private warning = "";
   private flashId: string | undefined;
   private markerFrame = 0;
+  private blockedDraftId: string | undefined;
+  private writesBlocked = false;
 
   async toggle(): Promise<void> {
     if (this.active) this.deactivate();
@@ -103,8 +105,16 @@ class FeedbackController {
     if (result.status === "ok") this.draft = result.draft;
     else {
       this.draft = createDraft(key);
-      if (result.status === "corrupt") this.warning = `The saved draft is corrupt and was left unchanged: ${result.reason}`;
-      if (result.status === "unsupported") this.warning = `This draft uses newer schema version ${result.version} and was left unchanged.`;
+      if (result.status === "corrupt") {
+        this.warning = `The saved draft is corrupt and was left unchanged. Clear feedback to replace it. ${result.reason}`;
+        this.writesBlocked = true;
+        this.blockedDraftId = result.draftId;
+      }
+      if (result.status === "unsupported") {
+        this.warning = `This draft uses newer schema version ${result.version} and was left unchanged. Clear feedback to replace it.`;
+        this.writesBlocked = true;
+        this.blockedDraftId = result.draftId;
+      }
       if ("expired" in result && result.expired) this.status = "The expired draft was deleted.";
     }
     this.createHost();
@@ -411,8 +421,12 @@ class FeedbackController {
 
   private async clearAll(): Promise<void> {
     if (!confirm("Clear all feedback for this page? This cannot be undone.")) return;
-    await clearDraft(this.draft);
+    if (this.writesBlocked) await clearStoredDraft(this.draft.pageKey, this.blockedDraftId);
+    else await clearDraft(this.draft);
     this.draft = createDraft(pageKey(location.href));
+    this.writesBlocked = false;
+    this.blockedDraftId = undefined;
+    this.warning = "";
     this.located.clear();
     this.pending = undefined;
     this.editingId = undefined;
@@ -432,7 +446,9 @@ class FeedbackController {
     panel.className = `fp-panel${this.collapsed ? " collapsed" : ""}`;
     panel.setAttribute("aria-label", "Feedback Packet");
     panel.innerHTML = this.panelHtml();
-    panel.addEventListener("click", (event) => void this.handlePanelClick(event));
+    panel.addEventListener("click", (event) => void this.handlePanelClick(event).catch((error) => {
+      this.setStatus(error instanceof Error ? error.message : "The action failed.", true);
+    }));
     panel.addEventListener("change", (event) => void this.handlePanelChange(event));
     this.root.append(panel);
     this.renderMarkers();
@@ -447,9 +463,9 @@ class FeedbackController {
       <div class="fp-body">
         ${this.warning ? `<div class="fp-warning">${escapeHtml(this.warning)}</div>` : ""}
         <div class="fp-actions">
-          <button class="fp-button primary" data-action="text">Comment on selection</button>
-          <button class="fp-button" data-action="element">Select element</button>
-          <button class="fp-button wide" data-action="page">Add page comment</button>
+          <button class="fp-button primary" data-action="text" ${this.writesBlocked ? "disabled" : ""}>Comment on selection</button>
+          <button class="fp-button" data-action="element" ${this.writesBlocked ? "disabled" : ""}>Select element</button>
+          <button class="fp-button wide" data-action="page" ${this.writesBlocked ? "disabled" : ""}>Add page comment</button>
         </div>
         ${this.selectingElement ? `<div class="fp-selecting">Move over the page, then click the intended element. Press Escape to cancel.<div class="fp-select-controls"><button class="fp-button" data-action="parent" ${this.candidate?.parentElement ? "" : "disabled"}>Parent</button><button class="fp-button" data-action="child" ${this.candidate?.firstElementChild ? "" : "disabled"}>Child</button><button class="fp-button" data-action="cancel-select">Cancel</button></div></div>` : ""}
         ${editor}
@@ -479,10 +495,10 @@ class FeedbackController {
     return `<div class="fp-list">${this.draft.annotations.map((annotation, index) => `
       <article class="fp-row">
         <span class="fp-number">${index + 1}</span>
-        <div class="fp-comment" data-action="focus" data-id="${annotation.id}" role="button" tabindex="0">
+        <button class="fp-comment" data-action="focus" data-id="${annotation.id}">
           <div class="fp-comment-text">${escapeHtml(annotation.comment)}</div>
           <div class="fp-meta">${annotation.type}${annotation.resolution === "unresolved" ? ` · <span class="fp-unresolved">unresolved</span>` : ""}${annotation.screenshot ? " · screenshot" : ""}</div>
-        </div>
+        </button>
         <div class="fp-row-menu">
           <button data-action="edit" data-id="${annotation.id}" aria-label="Edit comment ${index + 1}">Edit</button>
           <button data-action="recapture" data-id="${annotation.id}">${annotation.screenshot ? "Recapture" : "Capture"}</button>
@@ -512,6 +528,14 @@ class FeedbackController {
       preview.className = "fp-preview";
       preview.style.cssText = `left:${box.x}px;top:${box.y}px;width:${box.width}px;height:${box.height}px`;
       this.root.append(preview);
+    }
+    if (this.pending?.located) {
+      rectsForTarget(this.pending.located).forEach((box) => {
+        const marker = document.createElement("div");
+        marker.className = "fp-preview";
+        marker.style.cssText = `left:${box.x}px;top:${box.y}px;width:${box.width}px;height:${box.height}px`;
+        this.root!.append(marker);
+      });
     }
   }
 

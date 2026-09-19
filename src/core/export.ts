@@ -30,6 +30,7 @@ function evidenceLines(annotation: Annotation): string[] {
       line("Section context", target.sectionContext ?? "None"),
       line("Range", target.range),
       line("Containing elements", target.containingElements),
+      line("Bounding rects", target.rects),
     ];
   }
   return [
@@ -67,6 +68,8 @@ export function exportMarkdown(draft: Draft, exportedAt: string): string {
       line("Annotation ID", annotation.id),
       line("Resolved", annotation.resolution === "resolved" ? "Yes" : "No"),
       line("Captured at", annotation.context.capturedAt),
+      line("Created at", annotation.createdAt),
+      line("Updated at", annotation.updatedAt),
       line("URL", annotation.context.url),
       line("Title", annotation.context.title),
       line("Viewport", annotation.context.viewport),

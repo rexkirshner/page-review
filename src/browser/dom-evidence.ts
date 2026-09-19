@@ -202,9 +202,10 @@ function hasElementSignals(evidence: ElementEvidence): boolean {
 }
 
 export function locateElement(evidence: ElementEvidence): Element | undefined {
-  let exact: Element | null = null;
-  try { exact = document.querySelector(evidence.cssPath); } catch { /* Invalid paths are unresolved. */ }
-  if (exact && hasElementSignals(evidence) && scoreElementCandidate(evidence, fingerprint(exact)) >= 0.78) return exact;
+  let exactMatches: Element[] = [];
+  try { exactMatches = Array.from(document.querySelectorAll(evidence.cssPath)); } catch { /* Invalid paths are unresolved. */ }
+  const exact = exactMatches[0];
+  if (exactMatches.length === 1 && hasElementSignals(evidence) && scoreElementCandidate(evidence, fingerprint(exact)) >= 0.78) return exact;
 
   const candidates = Array.from(document.getElementsByTagName(evidence.tag)).slice(0, 1000)
     .map((element) => ({ element, score: scoreElementCandidate(evidence, fingerprint(element)) }))

@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Feedback Packet test page</title>
+    <link rel="stylesheet" href="styles.css">
+  </head>
+  <body>
+    <header class="site-head">
+      <a class="brand" href="#overview">Fixture &amp; Co.</a>
+      <nav aria-label="Fixture routes">
+        <a href="#overview">Overview</a>
+        <a href="#details">Details</a>
+        <a href="#changed">Changed state</a>
+      </nav>
+    </header>
+    <main>
+      <section id="overview" data-testid="overview-section">
+        <p class="eyebrow">Manual test fixture</p>
+        <h1>Rendered targets with real structure</h1>
+        <p class="lead">Select a phrase that <strong>starts in plain text and <em>crosses nested inline markup</em></strong> before ending in the paragraph.</p>
+        <button class="primary-action" aria-label="Save the example">Save example</button>
+      </section>
+
+      <section id="details" class="split" data-state="ready">
+        <div>
+          <p class="eyebrow">Nested elements</p>
+          <h2>Broaden and narrow this card</h2>
+          <article class="card" data-card-kind="sample">
+            <h3>Card heading</h3>
+            <p>A child paragraph with a <a href="#overview">local route</a> and a small status.</p>
+            <span class="status" aria-label="Status: ready">Ready</span>
+          </article>
+        </div>
+        <aside aria-label="Secondary information">
+          <h2>Repeated labels</h2>
+          <p>Duplicate text</p>
+          <p>Duplicate text</p>
+        </aside>
+      </section>
+
+      <section id="changed">
+        <p class="eyebrow">Dynamic state</p>
+        <h2>Change the rendered page</h2>
+        <p id="dynamic-copy">The target exists in the initial state.</p>
+        <button id="change-target">Replace target</button>
+        <button id="remove-target">Remove target</button>
+      </section>
+
+      <section>
+        <p class="eyebrow">Known limits</p>
+        <h2>Canvas and shadow root examples</h2>
+        <canvas id="sample-canvas" width="520" height="120" aria-label="A canvas drawing"></canvas>
+        <div id="shadow-example"></div>
+      </section>
+    </main>
+    <script src="fixture.js"></script>
+  </body>
+</html>

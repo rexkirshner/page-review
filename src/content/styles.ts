@@ -93,11 +93,12 @@ export const styles = String.raw`
     border-radius: 50%;
     font-weight: 800;
   }
-  .fp-comment { min-width: 0; cursor: pointer; }
+  .fp-comment { min-width: 0; padding: 0; text-align: left; color: inherit; background: transparent; border: 0; cursor: pointer; }
+  .fp-comment:focus-visible { outline: 2px solid #285c49; outline-offset: 3px; }
   .fp-comment-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: ui-sans-serif, system-ui, sans-serif; }
   .fp-meta { margin-top: 2px; color: #6b706a; font-size: 11px; }
   .fp-unresolved { color: #9a311f; font-weight: 700; }
-  .fp-row-menu { display: flex; gap: 4px; }
+  .fp-row-menu { grid-column: 2 / -1; display: flex; flex-wrap: wrap; gap: 4px; }
   .fp-row button { min-height: 26px; padding: 3px 6px; font-size: 11px; }
   .fp-editor { padding: 10px; background: #fffdf7; border: 1px solid #285c49; border-radius: 7px; }
   .fp-editor textarea {
