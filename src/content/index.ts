@@ -91,6 +91,9 @@ class FeedbackController {
   private markerFrame = 0;
   private blockedDraftId: string | undefined;
   private writesBlocked = false;
+  private editorComment = "";
+  private attachScreenshot = false;
+  private exportFormat: "md" | "json" = "md";
 
   async toggle(): Promise<void> {
     if (this.active) this.deactivate();
@@ -220,6 +223,7 @@ class FeedbackController {
     const captured = selection ? captureTextEvidence(selection) : undefined;
     if (!captured) return this.setStatus("Select some page text first.", true);
     selection?.removeAllRanges();
+    this.resetEditorState();
     this.pending = {
       id: crypto.randomUUID(), type: "text", context: capturePageContext(),
       target: captured.evidence, located: captured.range,
@@ -228,6 +232,7 @@ class FeedbackController {
   }
 
   private async startPageAnnotation(): Promise<void> {
+    this.resetEditorState();
     this.pending = { id: crypto.randomUUID(), type: "page", context: capturePageContext() };
     await this.capturePending();
   }
@@ -235,6 +240,7 @@ class FeedbackController {
   private async startElementAnnotation(element: Element): Promise<void> {
     this.selectingElement = false;
     this.candidate = undefined;
+    this.resetEditorState();
     this.pending = {
       id: crypto.randomUUID(), type: "element", context: capturePageContext(),
       target: captureElementEvidence(element), located: element,
@@ -284,48 +290,73 @@ class FeedbackController {
   }
 
   private async saveEditor(): Promise<void> {
-    const textarea = this.root?.querySelector<HTMLTextAreaElement>("#fp-comment");
-    const comment = textarea?.value ?? "";
+    this.syncEditorInputs();
+    const comment = this.editorComment;
     if (!comment.trim()) return this.setStatus("Enter a comment before saving.", true);
     const now = new Date().toISOString();
 
     if (this.pending) {
-      const attach = this.root?.querySelector<HTMLInputElement>("#fp-attach")?.checked ?? false;
+      const pending = this.pending;
+      const attach = this.attachScreenshot;
       const annotation: Annotation = {
-        id: this.pending.id,
-        type: this.pending.type,
+        id: pending.id,
+        type: pending.type,
         comment,
         createdAt: now,
         updatedAt: now,
-        context: this.pending.context,
-        target: this.pending.target,
-        resolution: this.pending.type === "page" || this.pending.located ? "resolved" : "unresolved",
+        context: pending.context,
+        target: pending.target,
+        resolution: pending.type === "page" || pending.located ? "resolved" : "unresolved",
       };
-      if (attach && this.pending.screenshot) {
+      let storedScreenshot = false;
+      if (attach && pending.screenshot) {
         try {
-          await putScreenshot(imageKey(this.draft, annotation.id), this.pending.screenshot.dataUrl);
+          await putScreenshot(imageKey(this.draft, annotation.id), pending.screenshot.dataUrl);
+          storedScreenshot = true;
           annotation.screenshot = {
             filename: `${annotation.id}.png`,
-            capturedAt: this.pending.screenshot.capturedAt,
-            width: this.pending.screenshot.width,
-            height: this.pending.screenshot.height,
+            capturedAt: pending.screenshot.capturedAt,
+            width: pending.screenshot.width,
+            height: pending.screenshot.height,
           };
         } catch (error) {
           return this.setStatus(error instanceof Error ? error.message : "Screenshot storage failed.", true);
         }
       }
-      this.draft.annotations.push(annotation);
-      if (this.pending.located) this.located.set(annotation.id, this.pending.located);
+      const nextDraft: Draft = {
+        ...this.draft,
+        lastEditedAt: now,
+        annotations: [...this.draft.annotations, annotation],
+      };
+      try {
+        await saveDraft(nextDraft);
+      } catch (error) {
+        if (storedScreenshot) {
+          try { await deleteScreenshot(imageKey(this.draft, annotation.id)); }
+          catch (cleanupError) { console.warn("Could not roll back an unsaved screenshot.", cleanupError); }
+        }
+        throw error;
+      }
+      this.draft = nextDraft;
+      if (pending.located) this.located.set(annotation.id, pending.located);
       this.pending = undefined;
     } else if (this.editingId) {
-      const annotation = this.draft.annotations.find((item) => item.id === this.editingId);
-      if (!annotation) return;
-      annotation.comment = comment;
-      annotation.updatedAt = now;
+      const editingId = this.editingId;
+      if (!this.draft.annotations.some((item) => item.id === editingId)) return;
+      const nextDraft: Draft = {
+        ...this.draft,
+        lastEditedAt: now,
+        annotations: this.draft.annotations.map((annotation) => annotation.id === editingId
+          ? { ...annotation, comment, updatedAt: now }
+          : annotation),
+      };
+      await saveDraft(nextDraft);
+      this.draft = nextDraft;
       this.editingId = undefined;
+    } else {
+      return;
     }
-    this.draft.lastEditedAt = now;
-    await saveDraft(this.draft);
+    this.resetEditorState();
     this.setStatus("Comment saved.");
   }
 
@@ -393,7 +424,7 @@ class FeedbackController {
 
   private async exportFeedback(copyOnly: boolean): Promise<void> {
     if (!this.draft.annotations.length) return this.setStatus("Add at least one comment before exporting.", true);
-    const format = this.root?.querySelector<HTMLSelectElement>("#fp-format")?.value === "json" ? "json" : "md";
+    const format = this.exportFormat;
     const exportedAt = new Date().toISOString();
     const text = format === "json" ? exportJson(this.draft, exportedAt) : exportMarkdown(this.draft, exportedAt);
     const screenshots = this.draft.annotations.filter((item) => item.screenshot);
@@ -462,7 +493,10 @@ class FeedbackController {
     panel.addEventListener("click", (event) => void this.handlePanelClick(event).catch((error) => {
       this.setStatus(error instanceof Error ? error.message : "The action failed.", true);
     }));
-    panel.addEventListener("change", (event) => void this.handlePanelChange(event));
+    panel.addEventListener("input", (event) => this.handlePanelInput(event));
+    panel.addEventListener("change", (event) => void this.handlePanelChange(event).catch((error) => {
+      this.setStatus(error instanceof Error ? error.message : "The setting could not be saved.", true);
+    }));
     this.root.append(panel);
     this.renderMarkers();
   }
@@ -484,7 +518,7 @@ class FeedbackController {
         ${editor}
         <div class="fp-section"><span class="fp-label">Comments</span>${this.listHtml()}</div>
         <div class="fp-section fp-footer">
-          <select id="fp-format" aria-label="Export format"><option value="md">Markdown</option><option value="json">JSON</option></select>
+          <select id="fp-format" aria-label="Export format"><option value="md" ${this.exportFormat === "md" ? "selected" : ""}>Markdown</option><option value="json" ${this.exportFormat === "json" ? "selected" : ""}>JSON</option></select>
           <button class="fp-button primary" data-action="download">Download</button>
           <button class="fp-button" data-action="copy">Copy feedback</button>
           <button class="fp-button danger" data-action="clear">Clear feedback</button>
@@ -499,13 +533,13 @@ class FeedbackController {
     if (!this.pending && !existing) return "";
     const screenshotLine = this.pending
       ? (this.pending.screenshot
-        ? `<label class="fp-check"><input id="fp-attach" type="checkbox"> Attach screenshot</label>`
+        ? `<label class="fp-check"><input id="fp-attach" type="checkbox" ${this.attachScreenshot ? "checked" : ""}> Attach screenshot</label>`
         : this.pending.screenshotError
           ? `<p class="fp-status error">Screenshot unavailable: ${escapeHtml(this.pending.screenshotError)}</p>`
           : `<p class="fp-status">Capturing screenshot…</p>`)
       : "";
     const capturePending = Boolean(this.pending && !this.pending.screenshot && !this.pending.screenshotError);
-    return `<div class="fp-section"><div class="fp-editor"><label class="fp-label" for="fp-comment">Comment</label><textarea id="fp-comment">${escapeHtml(existing?.comment ?? "")}</textarea>${screenshotLine}<div class="fp-editor-actions"><button class="fp-button" data-action="cancel-editor">Cancel</button><button class="fp-button primary" data-action="save" ${capturePending ? "disabled" : ""}>Save comment</button></div></div></div>`;
+    return `<div class="fp-section"><div class="fp-editor"><label class="fp-label" for="fp-comment">Comment</label><textarea id="fp-comment">${escapeHtml(this.editorComment)}</textarea>${screenshotLine}<div class="fp-editor-actions"><button class="fp-button" data-action="cancel-editor">Cancel</button><button class="fp-button primary" data-action="save" ${capturePending ? "disabled" : ""}>Save comment</button></div></div></div>`;
   }
 
   private listHtml(): string {
@@ -570,10 +604,19 @@ class FeedbackController {
     if (action === "parent") this.broadenCandidate();
     if (action === "child") this.narrowCandidate();
     if (action === "cancel-select") { this.selectingElement = false; this.candidate = undefined; this.render(); }
-    if (action === "cancel-editor") { this.pending = undefined; this.editingId = undefined; this.render(); }
+    if (action === "cancel-editor") { this.pending = undefined; this.editingId = undefined; this.resetEditorState(); this.render(); }
     if (action === "save") await this.saveEditor();
     if (action === "focus" && id) this.focusAnnotation(id);
-    if (action === "edit" && id) { this.editingId = id; this.pending = undefined; this.render(); requestAnimationFrame(() => this.root?.querySelector<HTMLTextAreaElement>("textarea")?.focus()); }
+    if (action === "edit" && id) {
+      const annotation = this.draft.annotations.find((item) => item.id === id);
+      if (!annotation) return;
+      this.editingId = id;
+      this.pending = undefined;
+      this.editorComment = annotation.comment;
+      this.attachScreenshot = false;
+      this.render();
+      requestAnimationFrame(() => this.root?.querySelector<HTMLTextAreaElement>("textarea")?.focus());
+    }
     if (action === "delete" && id) await this.removeAnnotation(id);
     if (action === "recapture" && id) await this.recaptureScreenshot(id);
     if (action === "remove-shot" && id) await this.removeAnnotationScreenshot(id);
@@ -584,10 +627,32 @@ class FeedbackController {
 
   private async handlePanelChange(event: Event): Promise<void> {
     const target = event.target as HTMLSelectElement;
+    if (target.id === "fp-format") {
+      this.exportFormat = target.value === "json" ? "json" : "md";
+      return;
+    }
     if (target.id !== "fp-retention") return;
     this.settings.retentionDays = target.value === "never" ? null : Number(target.value) as 7 | 30 | 90;
     await saveSettings(this.settings);
     this.setStatus("Retention setting saved.");
+  }
+
+  private handlePanelInput(event: Event): void {
+    const target = event.target;
+    if (target instanceof HTMLTextAreaElement && target.id === "fp-comment") this.editorComment = target.value;
+    if (target instanceof HTMLInputElement && target.id === "fp-attach") this.attachScreenshot = target.checked;
+  }
+
+  private syncEditorInputs(): void {
+    const textarea = this.root?.querySelector<HTMLTextAreaElement>("#fp-comment");
+    const attach = this.root?.querySelector<HTMLInputElement>("#fp-attach");
+    if (textarea) this.editorComment = textarea.value;
+    if (attach) this.attachScreenshot = attach.checked;
+  }
+
+  private resetEditorState(): void {
+    this.editorComment = "";
+    this.attachScreenshot = false;
   }
 }
 
