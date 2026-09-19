@@ -258,7 +258,8 @@ export function locateElement(evidence: ElementEvidence): Element | undefined {
   let exactMatches: Element[] = [];
   try { exactMatches = Array.from(document.querySelectorAll(evidence.cssPath)); } catch { /* Invalid paths are unresolved. */ }
   const exact = exactMatches[0];
-  if (exactMatches.length === 1 && hasElementSignals(evidence) && scoreElementCandidate(evidence, fingerprint(exact)) >= 0.78) return exact;
+  if (exact && exactMatches.length === 1 && hasElementSignals(evidence)
+    && scoreElementCandidate(evidence, fingerprint(exact)) >= 0.78) return exact;
 
   const candidates = Array.from(document.getElementsByTagName(evidence.tag)).slice(0, 1000)
     .map((element) => ({ element, score: scoreElementCandidate(evidence, fingerprint(element)) }))
@@ -313,13 +314,20 @@ export function locateText(evidence: TextEvidence): Range | undefined {
     let startIndex = -1;
     let endIndex = -1;
     for (let index = 0; index < starts.length; index += 1) {
-      if (starts[index] <= start) startIndex = index;
-      if (starts[index] < end) endIndex = index;
+      const nodeStart = starts[index];
+      if (nodeStart === undefined) continue;
+      if (nodeStart <= start) startIndex = index;
+      if (nodeStart < end) endIndex = index;
     }
     if (startIndex < 0 || endIndex < 0) return [];
+    const startNode = nodes[startIndex];
+    const endNode = nodes[endIndex];
+    const startBase = starts[startIndex];
+    const endBase = starts[endIndex];
+    if (!startNode || !endNode || startBase === undefined || endBase === undefined) return [];
     const range = document.createRange();
-    range.setStart(nodes[startIndex], start - starts[startIndex]);
-    range.setEnd(nodes[endIndex], end - starts[endIndex]);
+    range.setStart(startNode, start - startBase);
+    range.setEnd(endNode, end - endBase);
     return textRangeMatchesEvidence(range, evidence) ? [range] : [];
   });
   return candidates.length === 1 ? candidates[0] : undefined;

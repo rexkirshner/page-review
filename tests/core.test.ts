@@ -199,16 +199,16 @@ test("draft migration handles v0 and rejects corrupt or future drafts", () => {
   assert.equal(readDraft({ ...draft, lastEditedAt: "not a date" }).status, "corrupt");
   assert.equal(readDraft({
     ...draft,
-    annotations: [{ ...draft.annotations[0], type: "element" }],
+    annotations: [{ ...draft.annotations[0]!, type: "element" }],
   }).status, "corrupt");
   assert.equal(readDraft({
     ...draft,
     annotations: [{
-      ...draft.annotations[0],
+      ...draft.annotations[0]!,
       target: {
-        ...draft.annotations[0].target,
+        ...draft.annotations[0]!.target,
         range: {
-          ...(draft.annotations[0].target?.kind === "text" ? draft.annotations[0].target.range : {}),
+          ...(draft.annotations[0]!.target?.kind === "text" ? draft.annotations[0]!.target.range : {}),
           startOffset: -1,
         },
       },
@@ -217,19 +217,19 @@ test("draft migration handles v0 and rejects corrupt or future drafts", () => {
   assert.equal(readDraft({
     ...draft,
     annotations: [{
-      ...draft.annotations[0],
-      target: { ...draft.annotations[0].target, exactQuote: "" },
+      ...draft.annotations[0]!,
+      target: { ...draft.annotations[0]!.target, exactQuote: "" },
     }],
   }).status, "corrupt");
   assert.equal(readDraft({
     ...draft,
-    annotations: [draft.annotations[0], { ...draft.annotations[0] }],
+    annotations: [draft.annotations[0]!, { ...draft.annotations[0]! }],
   }).status, "corrupt");
   assert.equal(readDraft({
     ...draft,
     annotations: [{
-      ...draft.annotations[0],
-      screenshot: { ...draft.annotations[0].screenshot!, filename: "../feedback.md" },
+      ...draft.annotations[0]!,
+      screenshot: { ...draft.annotations[0]!.screenshot!, filename: "../feedback.md" },
     }],
   }).status, "corrupt");
   assert.equal(readDraft({ schemaVersion: 99 }).status, "unsupported");
@@ -240,25 +240,25 @@ test("draft updates are immutable and centralize last-edited timestamps", () => 
   const draft = sampleDraft();
   const editedAt = "2026-09-20T00:00:00.000Z";
   const edited = editDraftAnnotationComment(draft, "annotation-1", "Changed verbatim.", editedAt);
-  assert.equal(draft.annotations[0].comment, "Keep this wording exactly.");
-  assert.equal(edited.annotations[0].comment, "Changed verbatim.");
-  assert.equal(edited.annotations[0].updatedAt, editedAt);
+  assert.equal(draft.annotations[0]!.comment, "Keep this wording exactly.");
+  assert.equal(edited.annotations[0]!.comment, "Changed verbatim.");
+  assert.equal(edited.annotations[0]!.updatedAt, editedAt);
   assert.equal(edited.lastEditedAt, editedAt);
 
   const withoutScreenshot = setDraftAnnotationScreenshot(edited, "annotation-1", undefined, editedAt);
-  assert.equal(withoutScreenshot.annotations[0].screenshot, undefined);
-  assert.ok(edited.annotations[0].screenshot);
+  assert.equal(withoutScreenshot.annotations[0]!.screenshot, undefined);
+  assert.ok(edited.annotations[0]!.screenshot);
 
   const resolved = setDraftAnnotationResolution(withoutScreenshot, "annotation-1", "resolved");
-  assert.equal(resolved.annotations[0].resolution, "resolved");
+  assert.equal(resolved.annotations[0]!.resolution, "resolved");
   assert.equal(resolved.lastEditedAt, withoutScreenshot.lastEditedAt);
-  assert.equal(resolved.annotations[0].updatedAt, withoutScreenshot.annotations[0].updatedAt);
+  assert.equal(resolved.annotations[0]!.updatedAt, withoutScreenshot.annotations[0]!.updatedAt);
 
   const removed = removeDraftAnnotation(resolved, "annotation-1", editedAt);
   assert.equal(removed.annotations.length, 0);
-  const readded = appendDraftAnnotation(removed, draft.annotations[0]);
+  const readded = appendDraftAnnotation(removed, draft.annotations[0]!);
   assert.equal(readded.annotations.length, 1);
-  assert.throws(() => appendDraftAnnotation(readded, draft.annotations[0]), /already exists/);
+  assert.throws(() => appendDraftAnnotation(readded, draft.annotations[0]!), /already exists/);
   assert.throws(() => editDraftAnnotationComment(draft, "missing", "No", editedAt), /does not exist/);
 });
 
@@ -277,14 +277,14 @@ test("Markdown and JSON exports carry equivalent comments, evidence, and version
 
 test("Markdown fences comments without interpreting their contents", () => {
   const draft = sampleDraft();
-  draft.annotations[0].comment = "## Not an annotation\n```js\nalert('still comment');\n```";
+  draft.annotations[0]!.comment = "## Not an annotation\n```js\nalert('still comment');\n```";
   const markdown = exportMarkdown(draft, now);
   assert.ok(markdown.includes("````text\n## Not an annotation\n```js\nalert('still comment');\n```\n````"));
 });
 
 test("Markdown escapes evidence whitespace that would break a list item", () => {
   const draft = sampleDraft();
-  const target = draft.annotations[0].target;
+  const target = draft.annotations[0]!.target;
   if (!target || target.kind !== "text") throw new Error("Expected text target");
   target.exactQuote = "labels\n  Duplicate";
   target.before = "\n  Repeated ";
@@ -298,6 +298,6 @@ test("ZIP export contains the feedback file and referenced PNG", () => {
   const bytes = new Uint8Array([137, 80, 78, 71]);
   const zip = unzipSync(buildZip("feedback.md", "# Feedback\n", { "annotation-1.png": bytes }));
   assert.deepEqual(Object.keys(zip).sort(), ["annotation-1.png", "feedback.md"]);
-  assert.equal(strFromU8(zip["feedback.md"]), "# Feedback\n");
-  assert.deepEqual(zip["annotation-1.png"], bytes);
+  assert.equal(strFromU8(zip["feedback.md"]!), "# Feedback\n");
+  assert.deepEqual(zip["annotation-1.png"]!, bytes);
 });

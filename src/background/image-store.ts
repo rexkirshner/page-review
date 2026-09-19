@@ -40,10 +40,13 @@ async function transaction<T>(mode: IDBTransactionMode, run: (store: IDBObjectSt
 function dataUrlToBlob(dataUrl: string): Blob {
   const match = /^data:([^;,]+);base64,(.*)$/.exec(dataUrl);
   if (!match) throw new Error("Screenshot is not a base64 data URL.");
-  const binary = atob(match[2]);
+  const mimeType = match[1];
+  const encoded = match[2];
+  if (!mimeType || encoded === undefined) throw new Error("Screenshot data is incomplete.");
+  const binary = atob(encoded);
   const bytes = new Uint8Array(binary.length);
   for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index);
-  return new Blob([bytes], { type: match[1] });
+  return new Blob([bytes], { type: mimeType });
 }
 
 async function blobToDataUrl(blob: Blob): Promise<string> {

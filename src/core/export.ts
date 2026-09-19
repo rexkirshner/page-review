@@ -70,7 +70,7 @@ export function exportMarkdown(draft: Draft, exportedAt: string): string {
   packet.annotations.forEach((annotation, index) => {
     output.push(
       "",
-      `## ${index + 1}. ${annotation.type === "page" ? "Page comment" : `${annotation.type[0].toUpperCase()}${annotation.type.slice(1)} target`}`,
+      `## ${index + 1}. ${annotation.type === "page" ? "Page comment" : annotation.type === "text" ? "Text target" : "Element target"}`,
       "",
       verbatimBlock(annotation.comment),
       "",
