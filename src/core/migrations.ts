@@ -23,21 +23,40 @@ function isNumber(value: unknown): value is number {
   return typeof value === "number" && Number.isFinite(value);
 }
 
+function isNonNegativeInteger(value: unknown): value is number {
+  return isNumber(value) && Number.isInteger(value) && value >= 0;
+}
+
+function isPositiveNumber(value: unknown): value is number {
+  return isNumber(value) && value > 0;
+}
+
+function isOptionalString(value: unknown): boolean {
+  return value === undefined || typeof value === "string";
+}
+
+function isTimestamp(value: unknown): value is string {
+  return typeof value === "string" && Number.isFinite(Date.parse(value));
+}
+
 function isRect(value: unknown): boolean {
-  return isObject(value) && isNumber(value.x) && isNumber(value.y) && isNumber(value.width) && isNumber(value.height);
+  return isObject(value) && isNumber(value.x) && isNumber(value.y)
+    && isNumber(value.width) && value.width >= 0
+    && isNumber(value.height) && value.height >= 0;
 }
 
 function isElementSummary(value: unknown): boolean {
   return isObject(value) && typeof value.tag === "string" && typeof value.cssPath === "string"
+    && isOptionalString(value.id) && isOptionalString(value.text) && isOptionalString(value.accessibleName)
     && Array.isArray(value.classes) && value.classes.every((item) => typeof item === "string")
     && isObject(value.attributes) && Object.values(value.attributes).every((item) => typeof item === "string");
 }
 
 function isContext(value: unknown): boolean {
   return isObject(value) && typeof value.url === "string" && typeof value.title === "string"
-    && typeof value.capturedAt === "string" && isObject(value.viewport)
-    && isNumber(value.viewport.width) && isNumber(value.viewport.height) && isObject(value.scroll)
-    && isNumber(value.scroll.x) && isNumber(value.scroll.y) && isNumber(value.devicePixelRatio)
+    && isTimestamp(value.capturedAt) && isObject(value.viewport)
+    && isPositiveNumber(value.viewport.width) && isPositiveNumber(value.viewport.height) && isObject(value.scroll)
+    && isNumber(value.scroll.x) && isNumber(value.scroll.y) && isPositiveNumber(value.devicePixelRatio)
     && typeof value.userAgent === "string";
 }
 
@@ -48,10 +67,11 @@ function isTarget(value: unknown): boolean {
       && value.ancestors.every(isElementSummary) && isRect(value.rect);
   }
   return typeof value.exactQuote === "string" && typeof value.before === "string" && typeof value.after === "string"
+    && isOptionalString(value.sectionContext)
     && isObject(value.range) && isObject(value.range.startContainer) && Array.isArray(value.range.startContainer.indexes)
-    && value.range.startContainer.indexes.every(isNumber) && isNumber(value.range.startOffset)
+    && value.range.startContainer.indexes.every(isNonNegativeInteger) && isNonNegativeInteger(value.range.startOffset)
     && isObject(value.range.endContainer) && Array.isArray(value.range.endContainer.indexes)
-    && value.range.endContainer.indexes.every(isNumber) && isNumber(value.range.endOffset)
+    && value.range.endContainer.indexes.every(isNonNegativeInteger) && isNonNegativeInteger(value.range.endOffset)
     && isObject(value.containingElements) && isElementSummary(value.containingElements.start)
     && isElementSummary(value.containingElements.end) && isElementSummary(value.containingElements.common)
     && Array.isArray(value.rects) && value.rects.every(isRect);
@@ -62,13 +82,15 @@ function isAnnotation(value: unknown): boolean {
   const type = String(value.type);
   return typeof value.id === "string" && typeof value.comment === "string"
     && ["page", "text", "element"].includes(type)
-    && typeof value.createdAt === "string" && typeof value.updatedAt === "string"
+    && isTimestamp(value.createdAt) && isTimestamp(value.updatedAt)
     && (value.resolution === "resolved" || value.resolution === "unresolved")
     && isContext(value.context)
-    && (type === "page" ? value.target === undefined : isTarget(value.target))
+    && (type === "page"
+      ? value.target === undefined
+      : isObject(value.target) && value.target.kind === type && isTarget(value.target))
     && (value.screenshot === undefined || (isObject(value.screenshot)
-      && typeof value.screenshot.filename === "string" && typeof value.screenshot.capturedAt === "string"
-      && isNumber(value.screenshot.width) && isNumber(value.screenshot.height)));
+      && typeof value.screenshot.filename === "string" && isTimestamp(value.screenshot.capturedAt)
+      && isPositiveNumber(value.screenshot.width) && isPositiveNumber(value.screenshot.height)));
 }
 
 function validV1(value: unknown): value is Draft {
@@ -76,8 +98,8 @@ function validV1(value: unknown): value is Draft {
   return value.schemaVersion === DRAFT_SCHEMA_VERSION
     && typeof value.id === "string"
     && typeof value.pageKey === "string"
-    && typeof value.createdAt === "string"
-    && typeof value.lastEditedAt === "string"
+    && isTimestamp(value.createdAt)
+    && isTimestamp(value.lastEditedAt)
     && Array.isArray(value.annotations)
     && value.annotations.every(isAnnotation);
 }
