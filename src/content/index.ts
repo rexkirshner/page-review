@@ -370,9 +370,9 @@ class FeedbackController {
         createdAt: now,
         updatedAt: now,
         context: pending.context,
-        target: pending.target,
         resolution: pending.type === "page" || pending.located ? "resolved" : "unresolved",
       };
+      if (pending.target) annotation.target = pending.target;
       let storedScreenshot = false;
       if (attach && pending.screenshot) {
         try {

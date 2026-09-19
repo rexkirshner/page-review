@@ -31,12 +31,13 @@ function pathSegments(element: Element): PathSegment[] {
   const segments: PathSegment[] = [];
   let current: Element | null = element;
   while (current && current !== document.documentElement) {
-    segments.push({
+    const segment: PathSegment = {
       tag: current.tagName.toLowerCase(),
-      id: current.id || undefined,
       classes: Array.from(current.classList),
       nthOfType: nthOfType(current),
-    });
+    };
+    if (current.id) segment.id = current.id;
+    segments.push(segment);
     if (current.id && looksStable(current.id)) break;
     current = current.parentElement;
   }
@@ -68,27 +69,31 @@ function accessibleName(element: Element): string | undefined {
 }
 
 export function summarizeElement(element: Element): ElementSummary {
-  return {
+  const summary: ElementSummary = {
     tag: element.tagName.toLowerCase(),
-    id: element.id && looksStable(element.id) ? element.id : undefined,
     classes: Array.from(element.classList).filter(looksStable).slice(0, 8),
     attributes: evidenceAttributes(element),
-    text: cleanText(renderedText(element)),
-    accessibleName: accessibleName(element),
     cssPath: buildCssPath(pathSegments(element)),
   };
+  if (element.id && looksStable(element.id)) summary.id = element.id;
+  const text = cleanText(renderedText(element));
+  if (text) summary.text = text;
+  const name = accessibleName(element);
+  if (name) summary.accessibleName = name;
+  return summary;
 }
 
 function fingerprint(element: Element): ElementFingerprint {
   const summary = summarizeElement(element);
-  return {
+  const result: ElementFingerprint = {
     tag: summary.tag,
-    id: summary.id,
     classes: summary.classes,
     attributes: summary.attributes,
-    text: summary.text,
-    accessibleName: summary.accessibleName,
   };
+  if (summary.id) result.id = summary.id;
+  if (summary.text) result.text = summary.text;
+  if (summary.accessibleName) result.accessibleName = summary.accessibleName;
+  return result;
 }
 
 export function nodePath(node: Node): NodePath {
@@ -212,27 +217,29 @@ export function captureTextEvidence(selection: Selection): { evidence: TextEvide
   const endElement = elementForNode(range.endContainer);
   const common = commonElement(range);
   const surrounding = surroundingText(range);
+  const evidence: TextEvidence = {
+    kind: "text",
+    exactQuote,
+    range: {
+      startContainer: nodePath(range.startContainer),
+      startOffset: range.startOffset,
+      endContainer: nodePath(range.endContainer),
+      endOffset: range.endOffset,
+    },
+    containingElements: {
+      start: summarizeElement(startElement),
+      end: summarizeElement(endElement),
+      common: summarizeElement(common),
+    },
+    before: surrounding.before,
+    after: surrounding.after,
+    rects: deduplicateRects(Array.from(range.getClientRects()).map(rect)),
+  };
+  const heading = sectionContext(range, startElement);
+  if (heading) evidence.sectionContext = heading;
   return {
     range,
-    evidence: {
-      kind: "text",
-      exactQuote,
-      range: {
-        startContainer: nodePath(range.startContainer),
-        startOffset: range.startOffset,
-        endContainer: nodePath(range.endContainer),
-        endOffset: range.endOffset,
-      },
-      containingElements: {
-        start: summarizeElement(startElement),
-        end: summarizeElement(endElement),
-        common: summarizeElement(common),
-      },
-      before: surrounding.before,
-      after: surrounding.after,
-      sectionContext: sectionContext(range, startElement),
-      rects: deduplicateRects(Array.from(range.getClientRects()).map(rect)),
-    },
+    evidence,
   };
 }
 

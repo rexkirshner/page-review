@@ -15,6 +15,10 @@ interface LegacyDraftV0 {
   annotations: unknown[];
 }
 
+function optionalDraftId(draftId: string | undefined): { draftId?: string } {
+  return draftId === undefined ? {} : { draftId };
+}
+
 function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
@@ -131,23 +135,25 @@ export function readDraft(value: unknown): DraftReadResult {
   const draftId = typeof value.id === "string" ? value.id : undefined;
 
   const version = value.schemaVersion ?? 0;
-  if (typeof version !== "number") return { status: "corrupt", reason: "Draft schema version is invalid.", draftId };
-  if (version > DRAFT_SCHEMA_VERSION) return { status: "unsupported", version, draftId };
+  if (typeof version !== "number") {
+    return { status: "corrupt", reason: "Draft schema version is invalid.", ...optionalDraftId(draftId) };
+  }
+  if (version > DRAFT_SCHEMA_VERSION) return { status: "unsupported", version, ...optionalDraftId(draftId) };
 
   if (version === 0) {
     const legacy = value as unknown as LegacyDraftV0;
     if (typeof legacy.id !== "string" || typeof legacy.pageKey !== "string" ||
       typeof legacy.createdAt !== "string" || typeof legacy.updatedAt !== "string" ||
       !Array.isArray(legacy.annotations)) {
-      return { status: "corrupt", reason: "Legacy draft is incomplete.", draftId };
+      return { status: "corrupt", reason: "Legacy draft is incomplete.", ...optionalDraftId(draftId) };
     }
     const migrated = migrateV0(legacy);
     return validV1(migrated)
       ? { status: "ok", draft: migrated, migrated: true }
-      : { status: "corrupt", reason: "Legacy draft annotations are invalid.", draftId };
+      : { status: "corrupt", reason: "Legacy draft annotations are invalid.", ...optionalDraftId(draftId) };
   }
 
   return validV1(value)
     ? { status: "ok", draft: value, migrated: false }
-    : { status: "corrupt", reason: "Draft fields are invalid.", draftId };
+    : { status: "corrupt", reason: "Draft fields are invalid.", ...optionalDraftId(draftId) };
 }

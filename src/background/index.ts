@@ -37,7 +37,7 @@ chrome.runtime.onMessage.addListener((request: ExtensionRequest, sender, sendRes
           return { ok: true };
         case "image-get": {
           const dataUrl = await getImage(request.key);
-          return { ok: true, dataUrl };
+          return dataUrl === undefined ? { ok: true } : { ok: true, dataUrl };
         }
         case "image-delete":
           await deleteImage(request.key);
