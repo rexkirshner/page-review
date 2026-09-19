@@ -22,8 +22,8 @@ export async function loadDraft(key: string, settings: Settings, now = Date.now(
   const result = readDraft(stored[storageKey]);
   if (result.status !== "ok") return result;
   if (isExpired(result.draft, settings.retentionDays, now)) {
-    await chrome.storage.local.remove(storageKey);
     await deleteDraftScreenshots(result.draft.id);
+    await chrome.storage.local.remove(storageKey);
     return { status: "missing", expired: true };
   }
   if (result.migrated) await saveDraft(result.draft);
@@ -35,13 +35,13 @@ export async function saveDraft(draft: Draft): Promise<void> {
 }
 
 export async function clearDraft(draft: Draft): Promise<void> {
-  await chrome.storage.local.remove(draftKey(draft.pageKey));
   await deleteDraftScreenshots(draft.id);
+  await chrome.storage.local.remove(draftKey(draft.pageKey));
 }
 
 export async function clearStoredDraft(key: string, storedDraftId?: string): Promise<void> {
-  await chrome.storage.local.remove(draftKey(key));
   if (storedDraftId) await deleteDraftScreenshots(storedDraftId);
+  await chrome.storage.local.remove(draftKey(key));
 }
 
 export function createDraft(key: string, now = new Date().toISOString()): Draft {
