@@ -135,7 +135,7 @@ export function readDraft(value: unknown): DraftReadResult {
   const draftId = typeof value.id === "string" ? value.id : undefined;
 
   const version = value.schemaVersion ?? 0;
-  if (typeof version !== "number") {
+  if (!isNonNegativeInteger(version)) {
     return { status: "corrupt", reason: "Draft schema version is invalid.", ...optionalDraftId(draftId) };
   }
   if (version > DRAFT_SCHEMA_VERSION) return { status: "unsupported", version, ...optionalDraftId(draftId) };
