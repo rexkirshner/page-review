@@ -120,17 +120,55 @@ function commonElement(range: Range): Element {
   return elementForNode(range.commonAncestorContainer);
 }
 
-function surroundingText(range: Range): { before: string; after: string } {
-  const root = commonElement(range);
-  const all = root.textContent ?? "";
+function visibleTextNodes(root: Node): Text[] {
+  const nodes: Text[] = [];
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
+    acceptNode(node) {
+      const parent = node.parentElement;
+      if (!parent || parent.closest("script, style, noscript") || !node.textContent) return NodeFilter.FILTER_REJECT;
+      const style = getComputedStyle(parent);
+      return style.display !== "none" && style.visibility !== "hidden" && style.visibility !== "collapse"
+        && Number(style.opacity) !== 0 && parent.getClientRects().length > 0
+        ? NodeFilter.FILTER_ACCEPT
+        : NodeFilter.FILTER_REJECT;
+    },
+  });
+  while (walker.nextNode()) nodes.push(walker.currentNode as Text);
+  return nodes;
+}
+
+function visibleBoundaryOffset(root: Element, container: Node, offset: number, nodes: Text[]): number {
   const prefix = document.createRange();
   prefix.selectNodeContents(root);
-  prefix.setEnd(range.startContainer, range.startOffset);
-  const start = prefix.toString().length;
-  const selected = range.toString().length;
+  prefix.setEnd(container, offset);
+  let length = 0;
+  for (const node of nodes) {
+    if (node === container) return length + Math.min(offset, node.length);
+    if (prefix.intersectsNode(node)) length += node.length;
+  }
+  return length;
+}
+
+function visibleRangeModel(range: Range): { text: string; start: number; end: number } {
+  const root = commonElement(range);
+  const nodes = visibleTextNodes(root);
   return {
-    before: all.slice(Math.max(0, start - CONTEXT_LENGTH), start),
-    after: all.slice(start + selected, start + selected + CONTEXT_LENGTH),
+    text: nodes.map((node) => node.data).join(""),
+    start: visibleBoundaryOffset(root, range.startContainer, range.startOffset, nodes),
+    end: visibleBoundaryOffset(root, range.endContainer, range.endOffset, nodes),
+  };
+}
+
+function visibleRangeText(range: Range): string {
+  const model = visibleRangeModel(range);
+  return model.text.slice(model.start, model.end);
+}
+
+function surroundingText(range: Range): { before: string; after: string } {
+  const model = visibleRangeModel(range);
+  return {
+    before: model.text.slice(Math.max(0, model.start - CONTEXT_LENGTH), model.start),
+    after: model.text.slice(model.end, model.end + CONTEXT_LENGTH),
   };
 }
 
@@ -164,7 +202,7 @@ export function captureTextEvidence(selection: Selection): { evidence: TextEvide
   const range = selection.getRangeAt(0).cloneRange();
   if (range.startContainer.getRootNode() !== document || range.endContainer.getRootNode() !== document) return undefined;
   if (!document.body.contains(range.startContainer) || !document.body.contains(range.endContainer)) return undefined;
-  const exactQuote = range.toString();
+  const exactQuote = visibleRangeText(range);
   if (!exactQuote.trim()) return undefined;
   const startElement = elementForNode(range.startContainer);
   const endElement = elementForNode(range.endContainer);
@@ -228,7 +266,7 @@ export function locateElement(evidence: ElementEvidence): Element | undefined {
 }
 
 function textRangeMatchesEvidence(range: Range, evidence: TextEvidence): boolean {
-  if (range.toString() !== evidence.exactQuote) return false;
+  if (visibleRangeText(range) !== evidence.exactQuote) return false;
   const surrounding = surroundingText(range);
   if (surrounding.before !== evidence.before || surrounding.after !== evidence.after) return false;
   return scoreElementCandidate(
@@ -252,20 +290,7 @@ function rangeFromPaths(evidence: TextEvidence): Range | undefined {
 }
 
 function textNodes(): Text[] {
-  const nodes: Text[] = [];
-  const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, {
-    acceptNode(node) {
-      const parent = node.parentElement;
-      if (!parent || parent.closest("script, style, noscript") || !node.textContent) return NodeFilter.FILTER_REJECT;
-      const style = getComputedStyle(parent);
-      return style.display !== "none" && style.visibility !== "hidden" && style.visibility !== "collapse"
-        && Number(style.opacity) !== 0 && parent.getClientRects().length > 0
-        ? NodeFilter.FILTER_ACCEPT
-        : NodeFilter.FILTER_REJECT;
-    },
-  });
-  while (walker.nextNode()) nodes.push(walker.currentNode as Text);
-  return nodes;
+  return visibleTextNodes(document.body);
 }
 
 export function locateText(evidence: TextEvidence): Range | undefined {
