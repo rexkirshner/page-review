@@ -1,6 +1,7 @@
 import { readDraft, type DraftReadResult } from "../core/migrations";
-import { DEFAULT_SETTINGS, DRAFT_SCHEMA_VERSION, type Draft, type Settings } from "../core/model";
+import { DRAFT_SCHEMA_VERSION, type Draft, type Settings } from "../core/model";
 import { isExpired } from "../core/retention";
+import { normalizeSettings } from "../core/settings";
 import { deleteDraftScreenshots } from "./screenshot";
 
 const SETTINGS_KEY = "settings";
@@ -8,10 +9,7 @@ const draftKey = (key: string) => `draft:${key}`;
 
 export async function loadSettings(): Promise<Settings> {
   const stored = await chrome.storage.local.get(SETTINGS_KEY);
-  const value = stored[SETTINGS_KEY] as Partial<Settings> | undefined;
-  return [7, 30, 90, null].includes(value?.retentionDays ?? 7)
-    ? { retentionDays: value?.retentionDays ?? 7 }
-    : DEFAULT_SETTINGS;
+  return normalizeSettings(stored[SETTINGS_KEY]);
 }
 
 export async function saveSettings(settings: Settings): Promise<void> {

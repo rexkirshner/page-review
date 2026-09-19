@@ -8,6 +8,7 @@ import { DRAFT_SCHEMA_VERSION, type Draft } from "../src/core/model";
 import { pageKey, TRACKING_PARAMS } from "../src/core/page-key";
 import { expiresAt, isExpired } from "../src/core/retention";
 import { projectRectToBitmap } from "../src/core/screenshot-geometry";
+import { normalizeSettings } from "../src/core/settings";
 
 const now = "2026-09-19T12:00:00.000Z";
 
@@ -112,6 +113,17 @@ test("retention expires from last edit and supports never", () => {
   assert.equal(isExpired({ lastEditedAt: edited }, 7, Date.parse("2026-09-08T00:00:00.000Z")), true);
   assert.equal(isExpired({ lastEditedAt: edited }, 30, Date.parse("2026-09-08T00:00:00.000Z")), false);
   assert.equal(expiresAt(edited, null), null);
+});
+
+test("settings accept only supported retention values and return independent defaults", () => {
+  assert.deepEqual(normalizeSettings({ retentionDays: 30 }), { retentionDays: 30 });
+  assert.deepEqual(normalizeSettings({ retentionDays: null }), { retentionDays: null });
+  assert.deepEqual(normalizeSettings({ retentionDays: 14 }), { retentionDays: 7 });
+  assert.deepEqual(normalizeSettings("invalid"), { retentionDays: 7 });
+
+  const first = normalizeSettings(undefined);
+  first.retentionDays = 90;
+  assert.deepEqual(normalizeSettings(undefined), { retentionDays: 7 });
 });
 
 test("screenshot target rectangles scale and clip to the visible viewport", () => {
