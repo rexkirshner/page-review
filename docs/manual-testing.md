@@ -4,7 +4,7 @@ Build the extension, load `dist` as an unpacked extension, and serve the fixture
 
 ## Selection and comments
 
-- [ ] Select text that crosses the plain, `strong`, and `em` nodes in the lead paragraph. Confirm the blue preview covers only the selected rendered text before saving.
+- [ ] Select text that crosses the plain, `strong`, hidden `span`, and `em` nodes in the lead paragraph. Confirm the blue preview covers only rendered text and the exported quote/context omit “hidden fixture words.”
 - [ ] Save the text comment and confirm its numbered orange target remains aligned while scrolling.
 - [ ] Enter element-selection mode. Confirm hover preview does not activate links or buttons.
 - [ ] Use **Parent** and **Child** on the sample card, then click. Confirm the preview identifies the intended target before saving.
