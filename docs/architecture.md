@@ -19,7 +19,7 @@ The service worker in `src/background/index.ts` has only three jobs: inject feed
 1. A toolbar click grants temporary `activeTab` access and injects `content.js`.
 2. The content script normalizes the page URL and loads its draft. Loading applies migrations and retention.
 3. Text or element evidence is captured synchronously from the rendered page. Page context is captured at the same time.
-4. The shadow host is hidden for two animation frames. The service worker captures the active viewport. The content script draws an orange marker onto the resulting bitmap using `bitmap size / CSS viewport size` on each axis. This accounts for device pixel ratio and browser scaling without assuming they are identical.
+4. The shadow host is hidden for two animation frames. The service worker verifies that the requesting tab is still active before and after capturing the active viewport; a tab switch fails the capture rather than returning another page. The content script draws an orange marker onto the resulting bitmap using `bitmap size / CSS viewport size` on each axis. This accounts for device pixel ratio and browser scaling without assuming they are identical.
 5. The editor opens. The marked image remains only in memory unless **Attach screenshot** is checked.
 6. Draft JSON is written through `chrome.storage.local`. Attached PNG blobs are written through the service worker to IndexedDB under `<draft-id>:<annotation-id>`.
 7. Export is generated from captured evidence only. The page is never re-scraped at export time.
@@ -57,13 +57,13 @@ Resolved targets are displayed with fixed overlays inside a closed extension sha
 
 ## Export formats
 
-Markdown and JSON format version: **1**. Both contain page identity, export time, ordered annotations, verbatim comments, resolution state, annotation-time page context, target evidence, and screenshot filenames. Markdown is arranged for direct reading; JSON preserves the versioned structured representation.
+Markdown and JSON format version: **1**. Both contain page identity, export time, ordered annotations, verbatim comments, resolution state, annotation-time page context, target evidence, and screenshot filenames. Markdown places each comment in a dynamically sized text fence so comment-authored headings or code fences cannot be confused with packet structure. JSON preserves the versioned structured representation.
 
 Without screenshots, the extension downloads one `.md` or `.json` file. With screenshots, it creates a ZIP containing `feedback.md` or `feedback.json` and each referenced `<annotation-id>.png`. Copying returns only the selected text format.
 
 ## Storage decision
 
-Chrome documents a 10 MB default limit for `chrome.storage.local`, expandable with `unlimitedStorage`. Viewport PNGs can exhaust that limit after only a few annotations. IndexedDB supports blobs in extension service workers and keeps image bytes separate from small, inspectable draft metadata, so screenshots use IndexedDB and the extension does not request `unlimitedStorage`.
+Chrome documents a 10 MB default limit for `chrome.storage.local` in Chrome 114 and later, and 5 MB in Chrome 109–113; either limit can be expanded with `unlimitedStorage`. Viewport PNGs can exhaust those limits after only a few annotations. IndexedDB supports blobs in extension service workers and keeps image bytes separate from small, inspectable draft metadata, so screenshots use IndexedDB and the extension does not request `unlimitedStorage`.
 
 Primary references:
 

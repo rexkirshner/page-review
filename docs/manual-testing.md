@@ -42,6 +42,7 @@ Build the extension, load `dist` as an unpacked extension, and serve the fixture
 - [ ] Create an annotation with **Attach screenshot**. Confirm the PNG contains the page and one orange target marker, with no panel, editor, numbered saved markers, or blue preview.
 - [ ] Repeat near the top and after a long scroll. Confirm the marker aligns with the target in both images.
 - [ ] Repeat at device scale/DPR 1 and 2. Confirm marker position and thickness are correct and the saved dimensions match the PNG.
+- [ ] Start a screenshot capture and immediately switch tabs. Confirm the capture fails with an instruction to keep the annotated tab active and never saves an image of the other tab.
 - [ ] Resize the viewport and confirm the screenshot includes only the visible viewport.
 - [ ] Choose **Recapture** after scrolling or changing the viewport. Confirm the PNG and capture timestamp change only then.
 - [ ] Choose **Remove image** and confirm later exports no longer reference or contain it.

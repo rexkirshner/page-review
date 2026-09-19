@@ -9,7 +9,7 @@ The extension does not use a backend or call an LLM. Drafts and screenshots rema
 Requirements: Node.js 20 or newer and a current version of Chrome.
 
 ```sh
-npm install
+npm ci
 npm run build
 ```
 
@@ -21,6 +21,8 @@ Then:
 4. Pin **Feedback Packet** if desired.
 
 Click the toolbar action on an ordinary web page to turn feedback mode on for that tab. Refreshing or navigating turns it off; clicking the action again restores that page's saved draft.
+
+After rebuilding and reloading the unpacked extension, refresh any pages that already had feedback mode open. Chrome invalidates their old content-script context when an extension is reloaded.
 
 ## Use
 
