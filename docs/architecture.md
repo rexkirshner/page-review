@@ -49,7 +49,7 @@ Version 0 drafts are migrated explicitly by moving `updatedAt` to `lastEditedAt`
 
 ## Target re-location
 
-Text first uses the serialized DOM range and confirms the exact quote. If the path no longer works, a fallback accepts only a unique exact quote with matching before/after context, or a globally unique quote. This supports ranges spanning inline elements without wrapping or mutating page nodes.
+Text first uses the serialized DOM range and confirms the exact quote, surrounding context, and containing-element evidence. If the path no longer works, a fallback accepts only one candidate that also matches those complementary signals. Hidden text is excluded. This supports ranges spanning inline elements without wrapping or mutating page nodes.
 
 Elements first try the captured CSS path, then score same-tag candidates using ID, stable classes, selected attributes, accessible name, and visible text. The match must exceed a confidence threshold and be meaningfully better than the runner-up. A target with no complementary identifying evidence is unresolved rather than attached using the CSS path alone.
 

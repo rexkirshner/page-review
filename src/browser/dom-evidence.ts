@@ -8,6 +8,10 @@ function cleanText(value: string | null | undefined, max = 240): string | undefi
   return cleaned ? cleaned.slice(0, max) : undefined;
 }
 
+function renderedText(element: Element): string | null {
+  return element instanceof HTMLElement ? element.innerText : element.textContent;
+}
+
 function rect(value: DOMRect): Rect {
   return { x: value.x, y: value.y, width: value.width, height: value.height };
 }
@@ -68,7 +72,7 @@ export function summarizeElement(element: Element): ElementSummary {
     id: element.id && looksStable(element.id) ? element.id : undefined,
     classes: Array.from(element.classList).filter(looksStable).slice(0, 8),
     attributes: evidenceAttributes(element),
-    text: cleanText(element.textContent),
+    text: cleanText(renderedText(element)),
     accessibleName: accessibleName(element),
     cssPath: buildCssPath(pathSegments(element)),
   };
@@ -131,11 +135,16 @@ function surroundingText(range: Range): { before: string; after: string } {
 }
 
 function sectionContext(element: Element): string | undefined {
+  const selector = "h1, h2, h3, h4, h5, h6";
+  const containingHeading = element.closest(selector);
+  if (containingHeading) return cleanText(renderedText(containingHeading), 160);
   const section = element.closest("section, article, main, aside, nav") ?? element.parentElement;
-  const heading = section?.querySelector("h1, h2, h3, h4, h5, h6")
-    ?? Array.from(document.querySelectorAll("h1, h2, h3, h4, h5, h6")).reverse().find((item) =>
-      item.compareDocumentPosition(element) & Node.DOCUMENT_POSITION_FOLLOWING);
-  return cleanText(heading?.textContent, 160);
+  const localHeadings = section ? Array.from(section.querySelectorAll(selector)) : [];
+  const local = localHeadings.reverse().find((heading) =>
+    Boolean(heading.compareDocumentPosition(element) & Node.DOCUMENT_POSITION_FOLLOWING));
+  const preceding = local ?? Array.from(document.querySelectorAll(selector)).reverse().find((heading) =>
+    Boolean(heading.compareDocumentPosition(element) & Node.DOCUMENT_POSITION_FOLLOWING));
+  return cleanText(preceding ? renderedText(preceding) : undefined, 160);
 }
 
 export function capturePageContext(capturedAt = new Date().toISOString()): PageContext {
@@ -153,6 +162,8 @@ export function capturePageContext(capturedAt = new Date().toISOString()): PageC
 export function captureTextEvidence(selection: Selection): { evidence: TextEvidence; range: Range } | undefined {
   if (selection.rangeCount !== 1 || selection.isCollapsed) return undefined;
   const range = selection.getRangeAt(0).cloneRange();
+  if (range.startContainer.getRootNode() !== document || range.endContainer.getRootNode() !== document) return undefined;
+  if (!document.body.contains(range.startContainer) || !document.body.contains(range.endContainer)) return undefined;
   const exactQuote = range.toString();
   if (!exactQuote.trim()) return undefined;
   const startElement = elementForNode(range.startContainer);
@@ -198,7 +209,7 @@ export function captureElementEvidence(element: Element): ElementEvidence {
 }
 
 function hasElementSignals(evidence: ElementEvidence): boolean {
-  return Boolean(evidence.id || evidence.classes.length || Object.keys(evidence.attributes).length || evidence.text || evidence.accessibleName || evidence.ancestors.length);
+  return Boolean(evidence.id || evidence.classes.length || Object.keys(evidence.attributes).length || evidence.text || evidence.accessibleName);
 }
 
 export function locateElement(evidence: ElementEvidence): Element | undefined {
@@ -216,6 +227,16 @@ export function locateElement(evidence: ElementEvidence): Element | undefined {
   return best.element;
 }
 
+function textRangeMatchesEvidence(range: Range, evidence: TextEvidence): boolean {
+  if (range.toString() !== evidence.exactQuote) return false;
+  const surrounding = surroundingText(range);
+  if (surrounding.before !== evidence.before || surrounding.after !== evidence.after) return false;
+  return scoreElementCandidate(
+    evidence.containingElements.common,
+    fingerprint(commonElement(range)),
+  ) >= 0.78;
+}
+
 function rangeFromPaths(evidence: TextEvidence): Range | undefined {
   const start = nodeFromPath(evidence.range.startContainer);
   const end = nodeFromPath(evidence.range.endContainer);
@@ -224,7 +245,7 @@ function rangeFromPaths(evidence: TextEvidence): Range | undefined {
     const range = document.createRange();
     range.setStart(start, evidence.range.startOffset);
     range.setEnd(end, evidence.range.endOffset);
-    return range.toString() === evidence.exactQuote ? range : undefined;
+    return textRangeMatchesEvidence(range, evidence) ? range : undefined;
   } catch {
     return undefined;
   }
@@ -235,7 +256,10 @@ function textNodes(): Text[] {
   const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, {
     acceptNode(node) {
       const parent = node.parentElement;
-      return parent && !parent.closest("script, style, noscript") && node.textContent
+      if (!parent || parent.closest("script, style, noscript") || !node.textContent) return NodeFilter.FILTER_REJECT;
+      const style = getComputedStyle(parent);
+      return style.display !== "none" && style.visibility !== "hidden" && style.visibility !== "collapse"
+        && Number(style.opacity) !== 0 && parent.getClientRects().length > 0
         ? NodeFilter.FILTER_ACCEPT
         : NodeFilter.FILTER_REJECT;
     },
@@ -255,24 +279,19 @@ export function locateText(evidence: TextEvidence): Range | undefined {
   const matches: number[] = [];
   let position = text.indexOf(evidence.exactQuote);
   while (position >= 0) { matches.push(position); position = text.indexOf(evidence.exactQuote, position + 1); }
-  const contextual = matches.filter((start) => {
-    const before = text.slice(Math.max(0, start - evidence.before.length), start);
-    const after = text.slice(start + evidence.exactQuote.length, start + evidence.exactQuote.length + evidence.after.length);
-    return (!evidence.before || before === evidence.before) && (!evidence.after || after === evidence.after);
+  const candidates = matches.flatMap((start) => {
+    const end = start + evidence.exactQuote.length;
+    let startIndex = -1;
+    let endIndex = -1;
+    for (let index = 0; index < starts.length; index += 1) {
+      if (starts[index] <= start) startIndex = index;
+      if (starts[index] < end) endIndex = index;
+    }
+    if (startIndex < 0 || endIndex < 0) return [];
+    const range = document.createRange();
+    range.setStart(nodes[startIndex], start - starts[startIndex]);
+    range.setEnd(nodes[endIndex], end - starts[endIndex]);
+    return textRangeMatchesEvidence(range, evidence) ? [range] : [];
   });
-  const chosen = contextual.length === 1 ? contextual[0] : matches.length === 1 ? matches[0] : undefined;
-  if (chosen === undefined) return undefined;
-
-  const endPosition = chosen + evidence.exactQuote.length;
-  let startIndex = -1;
-  let endIndex = -1;
-  for (let index = 0; index < starts.length; index += 1) {
-    if (starts[index] <= chosen) startIndex = index;
-    if (starts[index] < endPosition) endIndex = index;
-  }
-  if (startIndex < 0 || endIndex < 0) return undefined;
-  const range = document.createRange();
-  range.setStart(nodes[startIndex], chosen - starts[startIndex]);
-  range.setEnd(nodes[endIndex], endPosition - starts[endIndex]);
-  return range.toString() === evidence.exactQuote ? range : undefined;
+  return candidates.length === 1 ? candidates[0] : undefined;
 }
