@@ -275,6 +275,13 @@ test("Markdown and JSON exports carry equivalent comments, evidence, and version
   assert.equal(json.annotations[0].target.exactQuote, "text across inline elements");
 });
 
+test("Markdown fences comments without interpreting their contents", () => {
+  const draft = sampleDraft();
+  draft.annotations[0].comment = "## Not an annotation\n```js\nalert('still comment');\n```";
+  const markdown = exportMarkdown(draft, now);
+  assert.ok(markdown.includes("````text\n## Not an annotation\n```js\nalert('still comment');\n```\n````"));
+});
+
 test("Markdown escapes evidence whitespace that would break a list item", () => {
   const draft = sampleDraft();
   const target = draft.annotations[0].target;

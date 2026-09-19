@@ -22,6 +22,12 @@ function line(label: string, value: unknown): string {
   return `- ${label}: ${plainString ? value : JSON.stringify(value)}`;
 }
 
+function verbatimBlock(value: string): string {
+  const longestRun = Math.max(0, ...(value.match(/`+/g) ?? []).map((run) => run.length));
+  const fence = "`".repeat(Math.max(3, longestRun + 1));
+  return `${fence}text\n${value}\n${fence}`;
+}
+
 function evidenceLines(annotation: Annotation): string[] {
   const target = annotation.target;
   if (!target) return [line("Target", "Page")];
@@ -66,7 +72,7 @@ export function exportMarkdown(draft: Draft, exportedAt: string): string {
       "",
       `## ${index + 1}. ${annotation.type === "page" ? "Page comment" : `${annotation.type[0].toUpperCase()}${annotation.type.slice(1)} target`}`,
       "",
-      annotation.comment,
+      verbatimBlock(annotation.comment),
       "",
       line("Annotation ID", annotation.id),
       line("Resolved", annotation.resolution === "resolved" ? "Yes" : "No"),
