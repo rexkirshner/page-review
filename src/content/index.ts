@@ -58,14 +58,14 @@ function dataUrlBytes(dataUrl: string): Uint8Array {
   return bytes;
 }
 
-function download(name: string, content: string | Uint8Array, mime: string): void {
+function download(name: string, content: string | Uint8Array, mime: string, container: ShadowRoot): void {
   const blob = new Blob([content as BlobPart], { type: mime });
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
   link.download = name;
   link.style.display = "none";
-  document.documentElement.append(link);
+  container.append(link);
   link.click();
   link.remove();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
@@ -164,7 +164,7 @@ class FeedbackController {
   private createHost(): void {
     this.host = document.createElement("div");
     this.host.dataset.feedbackPacket = "";
-    this.root = this.host.attachShadow({ mode: "open" });
+    this.root = this.host.attachShadow({ mode: "closed" });
     const style = document.createElement("style");
     style.textContent = styles;
     this.root.append(style);
@@ -520,8 +520,9 @@ class FeedbackController {
     }
 
     const stem = `feedback-${exportedAt.slice(0, 10)}`;
+    if (!this.root) throw new Error("The feedback panel is unavailable.");
     if (!screenshots.length) {
-      download(`${stem}.${format}`, text, format === "json" ? "application/json" : "text/markdown");
+      download(`${stem}.${format}`, text, format === "json" ? "application/json" : "text/markdown", this.root);
       return this.setStatus("Feedback downloaded.");
     }
 
@@ -531,7 +532,7 @@ class FeedbackController {
       if (!dataUrl || !annotation.screenshot) return this.setStatus(`Screenshot ${annotation.id} is missing; export stopped.`, true);
       images[annotation.screenshot.filename] = dataUrlBytes(dataUrl);
     }
-    download(`${stem}.zip`, buildZip(`feedback.${format}`, text, images), "application/zip");
+    download(`${stem}.zip`, buildZip(`feedback.${format}`, text, images), "application/zip", this.root);
     this.setStatus("Feedback ZIP downloaded.");
   }
 

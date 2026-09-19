@@ -10,7 +10,7 @@ The extension has five intentionally narrow parts:
 | Browser capture | `src/browser/dom-evidence.ts`, `screenshot.ts` | Read rendered DOM evidence, re-locate targets, capture and mark the visible viewport. |
 | Persistence | `src/browser/persistence.ts`, `src/background/image-store.ts` | Store draft JSON and settings in `chrome.storage.local`; store PNG blobs in extension-owned IndexedDB. |
 | Export | `src/core/export.ts` | Pure Markdown, JSON, and ZIP generation. |
-| UI | `src/content/` | Shadow-root panel, editor, target overlays, and user actions. |
+| UI | `src/content/` | Closed-shadow-root panel, editor, target overlays, and user actions. |
 
 The service worker in `src/background/index.ts` has only three jobs: inject feedback mode after a toolbar click, call `captureVisibleTab`, and broker access to the image database. Adding an export format belongs in `src/core`; adding a target type belongs in browser capture plus the versioned model.
 
@@ -53,7 +53,7 @@ Text first uses the serialized DOM range and confirms the exact quote, surroundi
 
 Elements first try the captured CSS path, then score same-tag candidates using ID, stable classes, selected attributes, accessible name, and visible text. The match must exceed a confidence threshold and be meaningfully better than the runner-up. A target with no complementary identifying evidence is unresolved rather than attached using the CSS path alone.
 
-Resolved targets are displayed with fixed overlays inside the extension shadow root. The page DOM is not wrapped or rewritten.
+Resolved targets are displayed with fixed overlays inside a closed extension shadow root. Page scripts cannot inspect the panel's comments or transient download elements, and the page DOM is not wrapped or rewritten.
 
 ## Export formats
 
