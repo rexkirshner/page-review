@@ -1,6 +1,21 @@
 import { deleteDraftImages, deleteImage, getImage, putImage } from "./image-store";
 import type { ExtensionRequest, ExtensionResponse } from "../shared/messages";
 
+const ACTIVE_TAB_MESSAGE = "Keep the annotated tab active while its screenshot is captured.";
+
+async function captureSenderTab(sender: chrome.runtime.MessageSender): Promise<string> {
+  const tabId = sender.tab?.id;
+  const windowId = sender.tab?.windowId;
+  if (tabId === undefined || windowId === undefined) throw new Error("The annotated tab is unavailable.");
+
+  const before = await chrome.tabs.get(tabId);
+  if (!before.active || before.windowId !== windowId) throw new Error(ACTIVE_TAB_MESSAGE);
+  const dataUrl = await chrome.tabs.captureVisibleTab(windowId, { format: "png" });
+  const after = await chrome.tabs.get(tabId);
+  if (!after.active || after.windowId !== windowId) throw new Error(ACTIVE_TAB_MESSAGE);
+  return dataUrl;
+}
+
 chrome.action.onClicked.addListener(async (tab) => {
   if (tab.id === undefined) return;
   try {
@@ -15,9 +30,7 @@ chrome.runtime.onMessage.addListener((request: ExtensionRequest, sender, sendRes
     try {
       switch (request.type) {
         case "capture-visible": {
-          if (sender.tab?.windowId === undefined) throw new Error("The active tab is unavailable.");
-          const dataUrl = await chrome.tabs.captureVisibleTab(sender.tab.windowId, { format: "png" });
-          return { ok: true, dataUrl };
+          return { ok: true, dataUrl: await captureSenderTab(sender) };
         }
         case "image-put":
           await putImage(request.key, request.dataUrl);
