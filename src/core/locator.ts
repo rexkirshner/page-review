@@ -59,36 +59,36 @@ export function buildCssPath(segments: PathSegment[]): string {
 
 export function scoreElementCandidate(expected: ElementFingerprint, candidate: ElementFingerprint): number {
   if (expected.tag.toLowerCase() !== candidate.tag.toLowerCase()) return 0;
-  let score = 0.2;
-  let possible = 0.2;
+  let matchedEvidence = 0;
+  let possibleEvidence = 0;
 
   if (expected.id) {
-    possible += 0.35;
-    if (expected.id === candidate.id) score += 0.35;
+    possibleEvidence += 0.35;
+    if (expected.id === candidate.id) matchedEvidence += 0.35;
   }
 
   if (expected.classes.length) {
-    possible += 0.15;
+    possibleEvidence += 0.15;
     const overlap = expected.classes.filter((name) => candidate.classes.includes(name)).length;
-    score += 0.15 * (overlap / expected.classes.length);
+    matchedEvidence += 0.15 * (overlap / expected.classes.length);
   }
 
   const attributes = Object.entries(expected.attributes);
   if (attributes.length) {
-    possible += 0.15;
+    possibleEvidence += 0.15;
     const matches = attributes.filter(([key, value]) => candidate.attributes[key] === value).length;
-    score += 0.15 * (matches / attributes.length);
+    matchedEvidence += 0.15 * (matches / attributes.length);
   }
 
   if (expected.accessibleName) {
-    possible += 0.1;
-    if (expected.accessibleName === candidate.accessibleName) score += 0.1;
+    possibleEvidence += 0.1;
+    if (expected.accessibleName === candidate.accessibleName) matchedEvidence += 0.1;
   }
 
   if (expected.text) {
-    possible += 0.05;
-    if (expected.text === candidate.text) score += 0.05;
+    possibleEvidence += 0.05;
+    if (expected.text === candidate.text) matchedEvidence += 0.05;
   }
 
-  return score / possible;
+  return possibleEvidence === 0 ? 0.2 : 0.2 + 0.8 * (matchedEvidence / possibleEvidence);
 }

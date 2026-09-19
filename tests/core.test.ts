@@ -106,6 +106,9 @@ test("locator helpers keep stable identifiers and score complementary evidence",
   assert.equal(scoreElementCandidate(expected, expected), 1);
   assert.ok(scoreElementCandidate(expected, { ...expected, id: "other", text: "Submit" }) < 0.7);
   assert.equal(scoreElementCandidate(expected, { ...expected, tag: "a" }), 0);
+  const textOnly = { tag: "p", classes: [], attributes: {}, text: "Original content" };
+  assert.equal(scoreElementCandidate(textOnly, textOnly), 1);
+  assert.equal(scoreElementCandidate(textOnly, { ...textOnly, text: "Replacement content" }), 0.2);
 });
 
 test("CSS locator escaping handles identifiers that are valid HTML but need CSS escapes", () => {
