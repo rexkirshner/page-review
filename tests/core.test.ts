@@ -7,6 +7,7 @@ import { readDraft } from "../src/core/migrations";
 import { DRAFT_SCHEMA_VERSION, type Draft } from "../src/core/model";
 import { pageKey, TRACKING_PARAMS } from "../src/core/page-key";
 import { expiresAt, isExpired } from "../src/core/retention";
+import { projectRectToBitmap } from "../src/core/screenshot-geometry";
 
 const now = "2026-09-19T12:00:00.000Z";
 
@@ -104,6 +105,33 @@ test("retention expires from last edit and supports never", () => {
   assert.equal(isExpired({ lastEditedAt: edited }, 7, Date.parse("2026-09-08T00:00:00.000Z")), true);
   assert.equal(isExpired({ lastEditedAt: edited }, 30, Date.parse("2026-09-08T00:00:00.000Z")), false);
   assert.equal(expiresAt(edited, null), null);
+});
+
+test("screenshot target rectangles scale and clip to the visible viewport", () => {
+  assert.deepEqual(
+    projectRectToBitmap(
+      { x: 100, y: 50, width: 200, height: 100 },
+      { width: 1200, height: 800 },
+      { width: 2400, height: 1600 },
+    ),
+    { x: 200, y: 100, width: 400, height: 200 },
+  );
+  assert.deepEqual(
+    projectRectToBitmap(
+      { x: -20, y: 760, width: 100, height: 100 },
+      { width: 1200, height: 800 },
+      { width: 2400, height: 1600 },
+    ),
+    { x: 0, y: 1520, width: 160, height: 80 },
+  );
+  assert.equal(
+    projectRectToBitmap(
+      { x: 1300, y: 20, width: 100, height: 100 },
+      { width: 1200, height: 800 },
+      { width: 2400, height: 1600 },
+    ),
+    undefined,
+  );
 });
 
 test("draft migration handles v0 and rejects corrupt or future drafts", () => {

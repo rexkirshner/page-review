@@ -1,4 +1,5 @@
 import type { Rect } from "../core/model";
+import { projectRectToBitmap } from "../core/screenshot-geometry";
 import type { ExtensionRequest, ExtensionResponse } from "../shared/messages";
 
 function send(request: ExtensionRequest): Promise<ExtensionResponse> {
@@ -29,12 +30,14 @@ export async function markScreenshot(dataUrl: string, targetRects: Rect[], viewp
   context.strokeStyle = "#ff4d24";
   context.fillStyle = "rgba(255, 77, 36, 0.12)";
   for (const target of targetRects) {
-    const x = Math.max(0, target.x * scaleX);
-    const y = Math.max(0, target.y * scaleY);
-    const width = Math.min(image.naturalWidth - x, target.width * scaleX);
-    const height = Math.min(image.naturalHeight - y, target.height * scaleY);
-    context.fillRect(x, y, width, height);
-    context.strokeRect(x, y, width, height);
+    const projected = projectRectToBitmap(
+      target,
+      viewport,
+      { width: image.naturalWidth, height: image.naturalHeight },
+    );
+    if (!projected) continue;
+    context.fillRect(projected.x, projected.y, projected.width, projected.height);
+    context.strokeRect(projected.x, projected.y, projected.width, projected.height);
   }
   return { dataUrl: canvas.toDataURL("image/png"), width: canvas.width, height: canvas.height };
 }
