@@ -629,15 +629,15 @@ class FeedbackController {
     return `<div class="fp-list">${this.draft.annotations.map((annotation, index) => `
       <article class="fp-row">
         <span class="fp-number">${index + 1}</span>
-        <button class="fp-comment" data-action="focus" data-id="${annotation.id}">
+        <button class="fp-comment" data-action="focus" data-id="${escapeHtml(annotation.id)}">
           <div class="fp-comment-text">${escapeHtml(annotation.comment)}</div>
           <div class="fp-meta">${annotation.type}${annotation.resolution === "unresolved" ? ` · <span class="fp-unresolved">unresolved</span>` : ""}${annotation.screenshot ? " · screenshot" : ""}</div>
         </button>
         <div class="fp-row-menu">
-          <button data-action="edit" data-id="${annotation.id}" aria-label="Edit comment ${index + 1}" ${disabled}>Edit</button>
-          <button data-action="recapture" data-id="${annotation.id}" ${disabled}>${annotation.screenshot ? "Recapture" : "Capture"}</button>
-          ${annotation.screenshot ? `<button data-action="remove-shot" data-id="${annotation.id}" ${disabled}>Remove image</button>` : ""}
-          <button data-action="delete" data-id="${annotation.id}" aria-label="Delete comment ${index + 1}" ${disabled}>Delete</button>
+          <button data-action="edit" data-id="${escapeHtml(annotation.id)}" aria-label="Edit comment ${index + 1}" ${disabled}>Edit</button>
+          <button data-action="recapture" data-id="${escapeHtml(annotation.id)}" ${disabled}>${annotation.screenshot ? "Recapture" : "Capture"}</button>
+          ${annotation.screenshot ? `<button data-action="remove-shot" data-id="${escapeHtml(annotation.id)}" ${disabled}>Remove image</button>` : ""}
+          <button data-action="delete" data-id="${escapeHtml(annotation.id)}" aria-label="Delete comment ${index + 1}" ${disabled}>Delete</button>
         </div>
       </article>`).join("")}</div>`;
   }
