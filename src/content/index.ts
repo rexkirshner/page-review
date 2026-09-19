@@ -714,8 +714,12 @@ class FeedbackController {
       return;
     }
     if (target.id !== "fp-retention") return;
-    this.settings.retentionDays = target.value === "never" ? null : Number(target.value) as 7 | 30 | 90;
-    await saveSettings(this.settings);
+    const nextSettings: Settings = {
+      ...this.settings,
+      retentionDays: target.value === "never" ? null : Number(target.value) as 7 | 30 | 90,
+    };
+    await saveSettings(nextSettings);
+    this.settings = nextSettings;
     this.setStatus("Retention setting saved.");
   }
 
