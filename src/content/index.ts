@@ -547,6 +547,8 @@ class FeedbackController {
 
   private panelHtml(): string {
     const count = this.draft.annotations.length;
+    const targetActionActive = Boolean(this.pending || this.editingId || this.selectingElement);
+    const targetActionsDisabled = this.writesBlocked || targetActionActive;
     if (this.collapsed) return `<header class="fp-head"><span class="fp-title">Feedback</span><span class="fp-count">${count}</span><button data-action="collapse" aria-label="Expand panel">+</button><button data-action="off" aria-label="Turn off feedback mode">×</button></header>`;
     const editor = this.editorHtml();
     return `
@@ -554,9 +556,9 @@ class FeedbackController {
       <div class="fp-body">
         ${this.warning ? `<div class="fp-warning">${escapeHtml(this.warning)}</div>` : ""}
         <div class="fp-actions">
-          <button class="fp-button primary" data-action="text" ${this.writesBlocked ? "disabled" : ""}>Comment on selection</button>
-          <button class="fp-button" data-action="element" ${this.writesBlocked ? "disabled" : ""}>Select element</button>
-          <button class="fp-button wide" data-action="page" ${this.writesBlocked ? "disabled" : ""}>Add page comment</button>
+          <button class="fp-button primary" data-action="text" ${targetActionsDisabled ? "disabled" : ""}>Comment on selection</button>
+          <button class="fp-button" data-action="element" ${targetActionsDisabled ? "disabled" : ""}>Select element</button>
+          <button class="fp-button wide" data-action="page" ${targetActionsDisabled ? "disabled" : ""}>Add page comment</button>
         </div>
         ${this.selectingElement ? `<div class="fp-selecting">Move over the page, then click the intended element. Press Escape to cancel.<div class="fp-select-controls"><button class="fp-button" data-action="parent" ${this.candidate?.parentElement ? "" : "disabled"}>Parent</button><button class="fp-button" data-action="child" ${this.candidate?.firstElementChild ? "" : "disabled"}>Child</button><button class="fp-button" data-action="cancel-select">Cancel</button></div></div>` : ""}
         ${editor}
@@ -588,6 +590,7 @@ class FeedbackController {
 
   private listHtml(): string {
     if (!this.draft.annotations.length) return `<p class="fp-empty">No comments on this page.</p>`;
+    const disabled = this.pending || this.editingId || this.selectingElement ? "disabled" : "";
     return `<div class="fp-list">${this.draft.annotations.map((annotation, index) => `
       <article class="fp-row">
         <span class="fp-number">${index + 1}</span>
@@ -596,10 +599,10 @@ class FeedbackController {
           <div class="fp-meta">${annotation.type}${annotation.resolution === "unresolved" ? ` · <span class="fp-unresolved">unresolved</span>` : ""}${annotation.screenshot ? " · screenshot" : ""}</div>
         </button>
         <div class="fp-row-menu">
-          <button data-action="edit" data-id="${annotation.id}" aria-label="Edit comment ${index + 1}">Edit</button>
-          <button data-action="recapture" data-id="${annotation.id}">${annotation.screenshot ? "Recapture" : "Capture"}</button>
-          ${annotation.screenshot ? `<button data-action="remove-shot" data-id="${annotation.id}">Remove image</button>` : ""}
-          <button data-action="delete" data-id="${annotation.id}" aria-label="Delete comment ${index + 1}">Delete</button>
+          <button data-action="edit" data-id="${annotation.id}" aria-label="Edit comment ${index + 1}" ${disabled}>Edit</button>
+          <button data-action="recapture" data-id="${annotation.id}" ${disabled}>${annotation.screenshot ? "Recapture" : "Capture"}</button>
+          ${annotation.screenshot ? `<button data-action="remove-shot" data-id="${annotation.id}" ${disabled}>Remove image</button>` : ""}
+          <button data-action="delete" data-id="${annotation.id}" aria-label="Delete comment ${index + 1}" ${disabled}>Delete</button>
         </div>
       </article>`).join("")}</div>`;
   }
