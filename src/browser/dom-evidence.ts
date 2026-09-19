@@ -226,7 +226,7 @@ export function captureTextEvidence(selection: Selection): { evidence: TextEvide
       },
       before: surrounding.before,
       after: surrounding.after,
-      sectionContext: sectionContext(common),
+      sectionContext: sectionContext(startElement),
       rects: Array.from(range.getClientRects()).map(rect),
     },
   };
