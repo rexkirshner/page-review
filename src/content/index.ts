@@ -453,7 +453,7 @@ class FeedbackController {
     const element = target instanceof Range
       ? (target.commonAncestorContainer instanceof Element ? target.commonAncestorContainer : target.commonAncestorContainer.parentElement)
       : target;
-    element?.scrollIntoView({ behavior: "smooth", block: "center", inline: "center" });
+    element?.scrollIntoView({ behavior: "auto", block: "center", inline: "center" });
   }
 
   private focusAnnotation(id: string): void {
