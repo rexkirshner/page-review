@@ -5,6 +5,7 @@ import {
   appendDraftAnnotation,
   editDraftAnnotationComment,
   removeDraftAnnotation,
+  setDraftAnnotationResolution,
   setDraftAnnotationScreenshot,
 } from "../src/core/draft";
 import { buildZip, exportJson, exportMarkdown } from "../src/core/export";
@@ -211,7 +212,12 @@ test("draft updates are immutable and centralize last-edited timestamps", () => 
   assert.equal(withoutScreenshot.annotations[0].screenshot, undefined);
   assert.ok(edited.annotations[0].screenshot);
 
-  const removed = removeDraftAnnotation(withoutScreenshot, "annotation-1", editedAt);
+  const resolved = setDraftAnnotationResolution(withoutScreenshot, "annotation-1", "resolved");
+  assert.equal(resolved.annotations[0].resolution, "resolved");
+  assert.equal(resolved.lastEditedAt, withoutScreenshot.lastEditedAt);
+  assert.equal(resolved.annotations[0].updatedAt, withoutScreenshot.annotations[0].updatedAt);
+
+  const removed = removeDraftAnnotation(resolved, "annotation-1", editedAt);
   assert.equal(removed.annotations.length, 0);
   const readded = appendDraftAnnotation(removed, draft.annotations[0]);
   assert.equal(readded.annotations.length, 1);

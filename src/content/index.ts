@@ -3,6 +3,7 @@ import {
   appendDraftAnnotation,
   editDraftAnnotationComment,
   removeDraftAnnotation,
+  setDraftAnnotationResolution,
   setDraftAnnotationScreenshot,
 } from "../core/draft";
 import type { Annotation, Draft, PageContext, Rect, Settings, TargetEvidence } from "../core/model";
@@ -179,6 +180,7 @@ class FeedbackController {
 
   private async resolveTargets(): Promise<void> {
     let changed = false;
+    let resolvedDraft = this.draft;
     this.located.clear();
     for (const annotation of this.draft.annotations) {
       let target: LocatedTarget | undefined;
@@ -186,9 +188,15 @@ class FeedbackController {
       if (annotation.target?.kind === "element") target = locateElement(annotation.target);
       if (target) this.located.set(annotation.id, target);
       const resolution = annotation.type === "page" || target ? "resolved" : "unresolved";
-      if (annotation.resolution !== resolution) { annotation.resolution = resolution; changed = true; }
+      if (annotation.resolution !== resolution) {
+        resolvedDraft = setDraftAnnotationResolution(resolvedDraft, annotation.id, resolution);
+        changed = true;
+      }
     }
-    if (changed) await saveDraft(this.draft);
+    if (changed) {
+      await saveDraft(resolvedDraft);
+      this.draft = resolvedDraft;
+    }
   }
 
   private addListeners(): void {

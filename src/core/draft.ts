@@ -1,4 +1,4 @@
-import type { Annotation, Draft, ScreenshotReference } from "./model";
+import type { Annotation, Draft, Resolution, ScreenshotReference } from "./model";
 
 function updateAnnotation(
   draft: Draft,
@@ -57,4 +57,15 @@ export function setDraftAnnotationScreenshot(
     const { screenshot: _screenshot, ...withoutScreenshot } = annotation;
     return { ...withoutScreenshot, updatedAt: editedAt };
   });
+}
+
+export function setDraftAnnotationResolution(draft: Draft, annotationId: string, resolution: Resolution): Draft {
+  let found = false;
+  const annotations = draft.annotations.map((annotation) => {
+    if (annotation.id !== annotationId) return annotation;
+    found = true;
+    return annotation.resolution === resolution ? annotation : { ...annotation, resolution };
+  });
+  if (!found) throw new Error(`Annotation ${annotationId} does not exist.`);
+  return { ...draft, annotations };
 }
