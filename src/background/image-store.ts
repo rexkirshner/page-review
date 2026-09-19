@@ -4,15 +4,23 @@ const STORE = "screenshots";
 function openDatabase(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
     const request = indexedDB.open(DATABASE, 1);
+    let blocked = false;
     request.onupgradeneeded = () => {
       if (!request.result.objectStoreNames.contains(STORE)) request.result.createObjectStore(STORE);
     };
     request.onsuccess = () => {
+      if (blocked) {
+        request.result.close();
+        return;
+      }
       request.result.onversionchange = () => request.result.close();
       resolve(request.result);
     };
     request.onerror = () => reject(request.error);
-    request.onblocked = () => reject(new Error("Screenshot storage is blocked by another extension context."));
+    request.onblocked = () => {
+      blocked = true;
+      reject(new Error("Screenshot storage is blocked by another extension context."));
+    };
   });
 }
 
