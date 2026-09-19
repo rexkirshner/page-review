@@ -4,9 +4,15 @@ const STORE = "screenshots";
 function openDatabase(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
     const request = indexedDB.open(DATABASE, 1);
-    request.onupgradeneeded = () => request.result.createObjectStore(STORE);
-    request.onsuccess = () => resolve(request.result);
+    request.onupgradeneeded = () => {
+      if (!request.result.objectStoreNames.contains(STORE)) request.result.createObjectStore(STORE);
+    };
+    request.onsuccess = () => {
+      request.result.onversionchange = () => request.result.close();
+      resolve(request.result);
+    };
     request.onerror = () => reject(request.error);
+    request.onblocked = () => reject(new Error("Screenshot storage is blocked by another extension context."));
   });
 }
 
@@ -17,9 +23,9 @@ async function transaction<T>(mode: IDBTransactionMode, run: (store: IDBObjectSt
     const request = run(tx.objectStore(STORE));
     let result: T;
     request.onsuccess = () => { result = request.result; };
-    request.onerror = () => reject(request.error);
     tx.oncomplete = () => { database.close(); resolve(result); };
-    tx.onerror = () => reject(tx.error);
+    tx.onerror = () => { database.close(); reject(tx.error ?? request.error); };
+    tx.onabort = () => { database.close(); reject(tx.error ?? new Error("Screenshot storage transaction was aborted.")); };
   });
 }
 
@@ -67,8 +73,8 @@ export async function deleteDraftImages(draftId: string): Promise<void> {
       if (String(cursor.key).startsWith(`${draftId}:`)) cursor.delete();
       cursor.continue();
     };
-    request.onerror = () => reject(request.error);
     tx.oncomplete = () => { database.close(); resolve(); };
-    tx.onerror = () => reject(tx.error);
+    tx.onerror = () => { database.close(); reject(tx.error ?? request.error); };
+    tx.onabort = () => { database.close(); reject(tx.error ?? new Error("Screenshot cleanup transaction was aborted.")); };
   });
 }
