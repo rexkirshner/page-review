@@ -126,10 +126,10 @@ class FeedbackController {
 
     try {
       this.settings = await loadSettings();
-      if (!this.isCurrentLifecycle(lifecycle)) return;
+      if (!this.canContinueActivation(lifecycle)) return;
       const key = pageKey(location.href);
       const result = await loadDraft(key, this.settings);
-      if (!this.isCurrentLifecycle(lifecycle)) return;
+      if (!this.canContinueActivation(lifecycle)) return;
       if (result.status === "ok") this.draft = result.draft;
       else {
         this.draft = createDraft(key);
@@ -147,7 +147,7 @@ class FeedbackController {
       }
       this.createHost();
       await this.resolveTargets();
-      if (!this.isCurrentLifecycle(lifecycle)) return;
+      if (!this.canContinueActivation(lifecycle)) return;
       this.addListeners();
       this.render();
     } catch (error) {
@@ -741,6 +741,13 @@ class FeedbackController {
 
   private isCurrentLifecycle(lifecycle: number): boolean {
     return this.active && this.lifecycle === lifecycle;
+  }
+
+  private canContinueActivation(lifecycle: number): boolean {
+    if (!this.isCurrentLifecycle(lifecycle)) return false;
+    if (location.href === this.activatedUrl) return true;
+    this.deactivate();
+    return false;
   }
 }
 
