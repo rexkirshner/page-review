@@ -96,6 +96,7 @@ class FeedbackController {
   private exportFormat: "md" | "json" = "md";
   private activatedUrl = "";
   private navigationTimer: number | undefined;
+  private lifecycle = 0;
 
   async toggle(): Promise<void> {
     if (this.active) this.deactivate();
@@ -103,33 +104,53 @@ class FeedbackController {
   }
 
   private async activate(): Promise<void> {
+    const lifecycle = ++this.lifecycle;
     this.active = true;
     this.activatedUrl = location.href;
-    this.settings = await loadSettings();
-    const key = pageKey(location.href);
-    const result = await loadDraft(key, this.settings);
-    if (result.status === "ok") this.draft = result.draft;
-    else {
-      this.draft = createDraft(key);
-      if (result.status === "corrupt") {
-        this.warning = `The saved draft is corrupt and was left unchanged. Clear feedback to replace it. ${result.reason}`;
-        this.writesBlocked = true;
-        this.blockedDraftId = result.draftId;
+    this.warning = "";
+    this.status = "";
+    this.statusError = false;
+    this.writesBlocked = false;
+    this.blockedDraftId = undefined;
+    this.located.clear();
+    this.pending = undefined;
+    this.editingId = undefined;
+    this.resetEditorState();
+
+    try {
+      this.settings = await loadSettings();
+      if (!this.isCurrentLifecycle(lifecycle)) return;
+      const key = pageKey(location.href);
+      const result = await loadDraft(key, this.settings);
+      if (!this.isCurrentLifecycle(lifecycle)) return;
+      if (result.status === "ok") this.draft = result.draft;
+      else {
+        this.draft = createDraft(key);
+        if (result.status === "corrupt") {
+          this.warning = `The saved draft is corrupt and was left unchanged. Clear feedback to replace it. ${result.reason}`;
+          this.writesBlocked = true;
+          this.blockedDraftId = result.draftId;
+        }
+        if (result.status === "unsupported") {
+          this.warning = `This draft uses newer schema version ${result.version} and was left unchanged. Clear feedback to replace it.`;
+          this.writesBlocked = true;
+          this.blockedDraftId = result.draftId;
+        }
+        if ("expired" in result && result.expired) this.status = "The expired draft was deleted.";
       }
-      if (result.status === "unsupported") {
-        this.warning = `This draft uses newer schema version ${result.version} and was left unchanged. Clear feedback to replace it.`;
-        this.writesBlocked = true;
-        this.blockedDraftId = result.draftId;
-      }
-      if ("expired" in result && result.expired) this.status = "The expired draft was deleted.";
+      this.createHost();
+      await this.resolveTargets();
+      if (!this.isCurrentLifecycle(lifecycle)) return;
+      this.addListeners();
+      this.render();
+    } catch (error) {
+      if (this.isCurrentLifecycle(lifecycle)) this.deactivate();
+      throw error;
     }
-    this.createHost();
-    await this.resolveTargets();
-    this.addListeners();
-    this.render();
   }
 
   private deactivate(): void {
+    this.lifecycle += 1;
     this.active = false;
     this.selectingElement = false;
     this.removeListeners();
@@ -263,9 +284,18 @@ class FeedbackController {
   }
 
   private async capturePending(): Promise<void> {
+    const pending = this.pending;
+    if (!pending) return;
     this.setStatus("Capturing the visible viewport…");
-    try { this.pending!.screenshot = await this.capture(this.pending!.located); }
-    catch (error) { this.pending!.screenshotError = error instanceof Error ? error.message : "Screenshot capture failed."; }
+    try {
+      const screenshot = await this.capture(pending.located);
+      if (!this.active || this.pending !== pending) return;
+      pending.screenshot = screenshot;
+    } catch (error) {
+      if (!this.active || this.pending !== pending) return;
+      pending.screenshotError = error instanceof Error ? error.message : "Screenshot capture failed.";
+    }
+    if (!this.active || this.pending !== pending) return;
     this.status = "";
     this.render();
     requestAnimationFrame(() => this.root?.querySelector<HTMLTextAreaElement>("textarea")?.focus());
@@ -668,11 +698,12 @@ class FeedbackController {
     this.editorComment = "";
     this.attachScreenshot = false;
   }
+
+  private isCurrentLifecycle(lifecycle: number): boolean {
+    return this.active && this.lifecycle === lifecycle;
+  }
 }
 
-if (window.__feedbackPacketController) {
-  void window.__feedbackPacketController.toggle();
-} else {
-  window.__feedbackPacketController = new FeedbackController();
-  void window.__feedbackPacketController.toggle();
-}
+const controller = window.__feedbackPacketController ?? new FeedbackController();
+window.__feedbackPacketController = controller;
+void controller.toggle().catch((error) => console.error("Feedback Packet could not toggle feedback mode.", error));
