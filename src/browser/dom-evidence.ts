@@ -173,10 +173,13 @@ function surroundingText(range: Range): { before: string; after: string } {
   };
 }
 
-function sectionContext(element: Element): string | undefined {
+function sectionContext(range: Range, element: Element): string | undefined {
   const selector = "h1, h2, h3, h4, h5, h6";
   const containingHeading = element.closest(selector);
   if (containingHeading) return cleanText(renderedText(containingHeading), 160);
+  const selectedHeading = Array.from(commonElement(range).querySelectorAll(selector))
+    .find((heading) => range.intersectsNode(heading));
+  if (selectedHeading) return cleanText(renderedText(selectedHeading), 160);
   const section = element.closest("section, article, main, aside, nav") ?? element.parentElement;
   const localHeadings = section ? Array.from(section.querySelectorAll(selector)) : [];
   const local = localHeadings.reverse().find((heading) =>
@@ -227,7 +230,7 @@ export function captureTextEvidence(selection: Selection): { evidence: TextEvide
       },
       before: surrounding.before,
       after: surrounding.after,
-      sectionContext: sectionContext(startElement),
+      sectionContext: sectionContext(range, startElement),
       rects: deduplicateRects(Array.from(range.getClientRects()).map(rect)),
     },
   };
