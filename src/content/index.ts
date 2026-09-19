@@ -1,4 +1,10 @@
 import { buildZip, exportJson, exportMarkdown } from "../core/export";
+import {
+  appendDraftAnnotation,
+  editDraftAnnotationComment,
+  removeDraftAnnotation,
+  setDraftAnnotationScreenshot,
+} from "../core/draft";
 import type { Annotation, Draft, PageContext, Rect, Settings, TargetEvidence } from "../core/model";
 import { pageKey } from "../core/page-key";
 import { captureElementEvidence, capturePageContext, captureTextEvidence, locateElement, locateText } from "../browser/dom-evidence";
@@ -367,11 +373,7 @@ class FeedbackController {
           return this.setStatus(error instanceof Error ? error.message : "Screenshot storage failed.", true);
         }
       }
-      const nextDraft: Draft = {
-        ...this.draft,
-        lastEditedAt: now,
-        annotations: [...this.draft.annotations, annotation],
-      };
+      const nextDraft = appendDraftAnnotation(this.draft, annotation);
       try {
         await saveDraft(nextDraft);
       } catch (error) {
@@ -386,14 +388,7 @@ class FeedbackController {
       this.pending = undefined;
     } else if (this.editingId) {
       const editingId = this.editingId;
-      if (!this.draft.annotations.some((item) => item.id === editingId)) return;
-      const nextDraft: Draft = {
-        ...this.draft,
-        lastEditedAt: now,
-        annotations: this.draft.annotations.map((annotation) => annotation.id === editingId
-          ? { ...annotation, comment, updatedAt: now }
-          : annotation),
-      };
+      const nextDraft = editDraftAnnotationComment(this.draft, editingId, comment, now);
       await saveDraft(nextDraft);
       this.draft = nextDraft;
       this.editingId = undefined;
@@ -410,11 +405,7 @@ class FeedbackController {
     const key = imageKey(this.draft, id);
     const previousScreenshot = annotation.screenshot ? await getScreenshot(key) : undefined;
     if (annotation.screenshot) await deleteScreenshot(key);
-    const nextDraft: Draft = {
-      ...this.draft,
-      lastEditedAt: new Date().toISOString(),
-      annotations: this.draft.annotations.filter((item) => item.id !== id),
-    };
+    const nextDraft = removeDraftAnnotation(this.draft, id, new Date().toISOString());
     try {
       await saveDraft(nextDraft);
     } catch (error) {
@@ -433,15 +424,7 @@ class FeedbackController {
     const previousScreenshot = await getScreenshot(key);
     await deleteScreenshot(key);
     const now = new Date().toISOString();
-    const nextDraft: Draft = {
-      ...this.draft,
-      lastEditedAt: now,
-      annotations: this.draft.annotations.map((item) => {
-        if (item.id !== id) return item;
-        const { screenshot: _screenshot, ...withoutScreenshot } = item;
-        return { ...withoutScreenshot, updatedAt: now };
-      }),
-    };
+    const nextDraft = setDraftAnnotationScreenshot(this.draft, id, undefined, now);
     try {
       await saveDraft(nextDraft);
     } catch (error) {
@@ -465,17 +448,12 @@ class FeedbackController {
       const previousScreenshot = annotation.screenshot ? await getScreenshot(key) : undefined;
       await putScreenshot(key, screenshot.dataUrl);
       const now = new Date().toISOString();
-      const nextDraft: Draft = {
-        ...this.draft,
-        lastEditedAt: now,
-        annotations: this.draft.annotations.map((item) => item.id === id
-          ? {
-            ...item,
-            updatedAt: now,
-            screenshot: { filename: `${id}.png`, capturedAt: screenshot.capturedAt, width: screenshot.width, height: screenshot.height },
-          }
-          : item),
-      };
+      const nextDraft = setDraftAnnotationScreenshot(this.draft, id, {
+        filename: `${id}.png`,
+        capturedAt: screenshot.capturedAt,
+        width: screenshot.width,
+        height: screenshot.height,
+      }, now);
       try {
         await saveDraft(nextDraft);
       } catch (error) {

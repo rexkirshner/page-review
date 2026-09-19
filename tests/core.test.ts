@@ -1,6 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { strFromU8, unzipSync } from "fflate";
+import {
+  appendDraftAnnotation,
+  editDraftAnnotationComment,
+  removeDraftAnnotation,
+  setDraftAnnotationScreenshot,
+} from "../src/core/draft";
 import { buildZip, exportJson, exportMarkdown } from "../src/core/export";
 import { buildCssPath, cssEscape, looksStable, scoreElementCandidate } from "../src/core/locator";
 import { readDraft } from "../src/core/migrations";
@@ -190,6 +196,27 @@ test("draft migration handles v0 and rejects corrupt or future drafts", () => {
   }).status, "corrupt");
   assert.equal(readDraft({ schemaVersion: 99 }).status, "unsupported");
   assert.equal(readDraft(undefined).status, "missing");
+});
+
+test("draft updates are immutable and centralize last-edited timestamps", () => {
+  const draft = sampleDraft();
+  const editedAt = "2026-09-20T00:00:00.000Z";
+  const edited = editDraftAnnotationComment(draft, "annotation-1", "Changed verbatim.", editedAt);
+  assert.equal(draft.annotations[0].comment, "Keep this wording exactly.");
+  assert.equal(edited.annotations[0].comment, "Changed verbatim.");
+  assert.equal(edited.annotations[0].updatedAt, editedAt);
+  assert.equal(edited.lastEditedAt, editedAt);
+
+  const withoutScreenshot = setDraftAnnotationScreenshot(edited, "annotation-1", undefined, editedAt);
+  assert.equal(withoutScreenshot.annotations[0].screenshot, undefined);
+  assert.ok(edited.annotations[0].screenshot);
+
+  const removed = removeDraftAnnotation(withoutScreenshot, "annotation-1", editedAt);
+  assert.equal(removed.annotations.length, 0);
+  const readded = appendDraftAnnotation(removed, draft.annotations[0]);
+  assert.equal(readded.annotations.length, 1);
+  assert.throws(() => appendDraftAnnotation(readded, draft.annotations[0]), /already exists/);
+  assert.throws(() => editDraftAnnotationComment(draft, "missing", "No", editedAt), /does not exist/);
 });
 
 test("Markdown and JSON exports carry equivalent comments, evidence, and versions", () => {

@@ -6,7 +6,7 @@ The extension has five intentionally narrow parts:
 
 | Part | Location | Responsibility |
 | --- | --- | --- |
-| Data model | `src/core/model.ts` | Versioned draft and export types. No DOM or Chrome APIs. |
+| Data model | `src/core/model.ts`, `draft.ts` | Versioned types and immutable draft updates. No DOM or Chrome APIs. |
 | Browser capture | `src/browser/dom-evidence.ts`, `screenshot.ts` | Read rendered DOM evidence, re-locate targets, capture and mark the visible viewport. |
 | Persistence | `src/browser/persistence.ts`, `src/background/image-store.ts` | Store draft JSON and settings in `chrome.storage.local`; store PNG blobs in extension-owned IndexedDB. |
 | Export | `src/core/export.ts` | Pure Markdown, JSON, and ZIP generation. |
