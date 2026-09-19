@@ -1,5 +1,5 @@
 import { buildZip, exportJson, exportMarkdown } from "../core/export";
-import type { Annotation, Draft, ElementEvidence, PageContext, Rect, Settings, TargetEvidence } from "../core/model";
+import type { Annotation, Draft, PageContext, Rect, Settings, TargetEvidence } from "../core/model";
 import { pageKey } from "../core/page-key";
 import { captureElementEvidence, capturePageContext, captureTextEvidence, locateElement, locateText } from "../browser/dom-evidence";
 import { clearDraft, clearStoredDraft, createDraft, loadDraft, loadSettings, saveDraft, saveSettings } from "../browser/persistence";
