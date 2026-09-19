@@ -8,6 +8,7 @@ import {
 } from "../core/draft";
 import type { Annotation, Draft, PageContext, Rect, Settings, TargetEvidence } from "../core/model";
 import { pageKey } from "../core/page-key";
+import { deduplicateRects } from "../core/screenshot-geometry";
 import { captureElementEvidence, capturePageContext, captureTextEvidence, locateElement, locateText } from "../browser/dom-evidence";
 import { clearDraft, clearStoredDraft, createDraft, loadDraft, loadSettings, saveDraft, saveSettings } from "../browser/persistence";
 import { captureVisibleScreenshot, deleteScreenshot, getScreenshot, putScreenshot } from "../browser/screenshot";
@@ -51,7 +52,12 @@ function imageKey(draft: Draft, annotationId: string): string {
 function rectsForTarget(target?: LocatedTarget): Rect[] {
   if (!target) return [];
   if (target instanceof Range) {
-    return Array.from(target.getClientRects()).map((value) => ({ x: value.x, y: value.y, width: value.width, height: value.height }));
+    return deduplicateRects(Array.from(target.getClientRects()).map((value) => ({
+      x: value.x,
+      y: value.y,
+      width: value.width,
+      height: value.height,
+    })));
   }
   const value = target.getBoundingClientRect();
   return [{ x: value.x, y: value.y, width: value.width, height: value.height }];

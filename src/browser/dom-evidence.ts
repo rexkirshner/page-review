@@ -1,5 +1,6 @@
 import { buildCssPath, looksStable, scoreElementCandidate, type ElementFingerprint, type PathSegment } from "../core/locator";
 import type { ElementEvidence, ElementSummary, NodePath, PageContext, Rect, TextEvidence } from "../core/model";
+import { deduplicateRects } from "../core/screenshot-geometry";
 
 const CONTEXT_LENGTH = 100;
 
@@ -227,7 +228,7 @@ export function captureTextEvidence(selection: Selection): { evidence: TextEvide
       before: surrounding.before,
       after: surrounding.after,
       sectionContext: sectionContext(startElement),
-      rects: Array.from(range.getClientRects()).map(rect),
+      rects: deduplicateRects(Array.from(range.getClientRects()).map(rect)),
     },
   };
 }

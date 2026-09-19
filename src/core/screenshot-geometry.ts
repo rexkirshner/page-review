@@ -5,6 +5,16 @@ interface Size {
   height: number;
 }
 
+export function deduplicateRects(rects: Rect[]): Rect[] {
+  const seen = new Set<string>();
+  return rects.filter((rect) => {
+    const key = `${rect.x}:${rect.y}:${rect.width}:${rect.height}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
 export function projectRectToBitmap(target: Rect, viewport: Size, bitmap: Size): Rect | undefined {
   if (viewport.width <= 0 || viewport.height <= 0 || bitmap.width <= 0 || bitmap.height <= 0) return undefined;
 

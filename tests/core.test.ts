@@ -14,7 +14,7 @@ import { readDraft } from "../src/core/migrations";
 import { DRAFT_SCHEMA_VERSION, type Draft } from "../src/core/model";
 import { pageKey, TRACKING_PARAMS } from "../src/core/page-key";
 import { expiresAt, isExpired } from "../src/core/retention";
-import { projectRectToBitmap } from "../src/core/screenshot-geometry";
+import { deduplicateRects, projectRectToBitmap } from "../src/core/screenshot-geometry";
 import { normalizeSettings } from "../src/core/settings";
 
 const now = "2026-09-19T12:00:00.000Z";
@@ -158,6 +158,12 @@ test("screenshot target rectangles scale and clip to the visible viewport", () =
     ),
     undefined,
   );
+});
+
+test("duplicate range rectangles are removed without merging distinct fragments", () => {
+  const first = { x: 10, y: 20, width: 30, height: 15 };
+  const second = { x: 40, y: 20, width: 25, height: 15 };
+  assert.deepEqual(deduplicateRects([first, second, { ...first }]), [first, second]);
 });
 
 test("draft migration handles v0 and rejects corrupt or future drafts", () => {
