@@ -306,6 +306,7 @@ function textNodes(): Text[] {
 }
 
 export function locateText(evidence: TextEvidence): Range | undefined {
+  if (!evidence.exactQuote.trim()) return undefined;
   const direct = rangeFromPaths(evidence);
   if (direct) return direct;
 
