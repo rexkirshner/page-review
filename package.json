@@ -5,6 +5,9 @@
   "author": "Rex Kirshner",
   "license": "MIT",
   "private": true,
+  "engines": {
+    "node": ">=20"
+  },
   "type": "module",
   "scripts": {
     "build": "node scripts/build.mjs",
