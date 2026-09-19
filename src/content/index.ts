@@ -485,9 +485,14 @@ class FeedbackController {
     const existing = this.editingId ? this.draft.annotations.find((item) => item.id === this.editingId) : undefined;
     if (!this.pending && !existing) return "";
     const screenshotLine = this.pending
-      ? (this.pending.screenshot ? `<label class="fp-check"><input id="fp-attach" type="checkbox"> Attach screenshot</label>` : `<p class="fp-status error">Screenshot unavailable: ${escapeHtml(this.pending.screenshotError ?? "capture failed")}</p>`)
+      ? (this.pending.screenshot
+        ? `<label class="fp-check"><input id="fp-attach" type="checkbox"> Attach screenshot</label>`
+        : this.pending.screenshotError
+          ? `<p class="fp-status error">Screenshot unavailable: ${escapeHtml(this.pending.screenshotError)}</p>`
+          : `<p class="fp-status">Capturing screenshot…</p>`)
       : "";
-    return `<div class="fp-section"><div class="fp-editor"><label class="fp-label" for="fp-comment">Comment</label><textarea id="fp-comment">${escapeHtml(existing?.comment ?? "")}</textarea>${screenshotLine}<div class="fp-editor-actions"><button class="fp-button" data-action="cancel-editor">Cancel</button><button class="fp-button primary" data-action="save">Save comment</button></div></div></div>`;
+    const capturePending = Boolean(this.pending && !this.pending.screenshot && !this.pending.screenshotError);
+    return `<div class="fp-section"><div class="fp-editor"><label class="fp-label" for="fp-comment">Comment</label><textarea id="fp-comment">${escapeHtml(existing?.comment ?? "")}</textarea>${screenshotLine}<div class="fp-editor-actions"><button class="fp-button" data-action="cancel-editor">Cancel</button><button class="fp-button primary" data-action="save" ${capturePending ? "disabled" : ""}>Save comment</button></div></div></div>`;
   }
 
   private listHtml(): string {
