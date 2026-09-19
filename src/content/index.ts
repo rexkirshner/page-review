@@ -407,23 +407,48 @@ class FeedbackController {
   private async removeAnnotation(id: string): Promise<void> {
     const annotation = this.draft.annotations.find((item) => item.id === id);
     if (!annotation || !confirm("Delete this comment?")) return;
-    if (annotation.screenshot) await deleteScreenshot(imageKey(this.draft, id));
-    this.draft.annotations = this.draft.annotations.filter((item) => item.id !== id);
-    this.draft.lastEditedAt = new Date().toISOString();
+    const key = imageKey(this.draft, id);
+    const previousScreenshot = annotation.screenshot ? await getScreenshot(key) : undefined;
+    if (annotation.screenshot) await deleteScreenshot(key);
+    const nextDraft: Draft = {
+      ...this.draft,
+      lastEditedAt: new Date().toISOString(),
+      annotations: this.draft.annotations.filter((item) => item.id !== id),
+    };
+    try {
+      await saveDraft(nextDraft);
+    } catch (error) {
+      await this.restoreScreenshot(key, previousScreenshot);
+      throw error;
+    }
+    this.draft = nextDraft;
     this.located.delete(id);
-    await saveDraft(this.draft);
     this.setStatus("Comment deleted.");
   }
 
   private async removeAnnotationScreenshot(id: string): Promise<void> {
     const annotation = this.draft.annotations.find((item) => item.id === id);
     if (!annotation?.screenshot) return;
-    await deleteScreenshot(imageKey(this.draft, id));
-    delete annotation.screenshot;
+    const key = imageKey(this.draft, id);
+    const previousScreenshot = await getScreenshot(key);
+    await deleteScreenshot(key);
     const now = new Date().toISOString();
-    annotation.updatedAt = now;
-    this.draft.lastEditedAt = now;
-    await saveDraft(this.draft);
+    const nextDraft: Draft = {
+      ...this.draft,
+      lastEditedAt: now,
+      annotations: this.draft.annotations.map((item) => {
+        if (item.id !== id) return item;
+        const { screenshot: _screenshot, ...withoutScreenshot } = item;
+        return { ...withoutScreenshot, updatedAt: now };
+      }),
+    };
+    try {
+      await saveDraft(nextDraft);
+    } catch (error) {
+      await this.restoreScreenshot(key, previousScreenshot);
+      throw error;
+    }
+    this.draft = nextDraft;
     this.setStatus("Screenshot removed.");
   }
 
@@ -436,12 +461,28 @@ class FeedbackController {
     await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
     try {
       const screenshot = await this.capture(target);
-      await putScreenshot(imageKey(this.draft, id), screenshot.dataUrl);
-      annotation.screenshot = { filename: `${id}.png`, capturedAt: screenshot.capturedAt, width: screenshot.width, height: screenshot.height };
+      const key = imageKey(this.draft, id);
+      const previousScreenshot = annotation.screenshot ? await getScreenshot(key) : undefined;
+      await putScreenshot(key, screenshot.dataUrl);
       const now = new Date().toISOString();
-      annotation.updatedAt = now;
-      this.draft.lastEditedAt = now;
-      await saveDraft(this.draft);
+      const nextDraft: Draft = {
+        ...this.draft,
+        lastEditedAt: now,
+        annotations: this.draft.annotations.map((item) => item.id === id
+          ? {
+            ...item,
+            updatedAt: now,
+            screenshot: { filename: `${id}.png`, capturedAt: screenshot.capturedAt, width: screenshot.width, height: screenshot.height },
+          }
+          : item),
+      };
+      try {
+        await saveDraft(nextDraft);
+      } catch (error) {
+        await this.restoreScreenshot(key, previousScreenshot);
+        throw error;
+      }
+      this.draft = nextDraft;
       this.setStatus("Screenshot captured.");
     } catch (error) {
       this.setStatus(error instanceof Error ? error.message : "Screenshot capture failed.", true);
@@ -700,6 +741,15 @@ class FeedbackController {
   private resetEditorState(): void {
     this.editorComment = "";
     this.attachScreenshot = false;
+  }
+
+  private async restoreScreenshot(key: string, previousDataUrl: string | undefined): Promise<void> {
+    try {
+      if (previousDataUrl) await putScreenshot(key, previousDataUrl);
+      else await deleteScreenshot(key);
+    } catch (error) {
+      console.warn("Could not roll back a screenshot storage change.", error);
+    }
   }
 
   private isCurrentLifecycle(lifecycle: number): boolean {
