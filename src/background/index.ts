@@ -4,21 +4,16 @@ import { extensionDisplayName } from "../shared/build";
 
 const ACTIVE_TAB_MESSAGE = "Keep the annotated tab active while its screenshot is captured.";
 const DEFAULT_ACTION_TITLE = `Toggle ${extensionDisplayName}`;
-const DEFAULT_BADGE_TEXT = "+";
-const DEFAULT_BADGE_COLOR = "#f05a35";
-
 async function clearActionError(tabId: number): Promise<void> {
   await Promise.all([
-    chrome.action.setBadgeBackgroundColor({ tabId, color: DEFAULT_BADGE_COLOR }),
-    chrome.action.setBadgeText({ tabId, text: DEFAULT_BADGE_TEXT }),
+    chrome.action.setBadgeText({ tabId, text: "" }),
     chrome.action.setTitle({ tabId, title: DEFAULT_ACTION_TITLE }),
   ]);
 }
 
 async function initializeAction(): Promise<void> {
   await Promise.all([
-    chrome.action.setBadgeBackgroundColor({ color: DEFAULT_BADGE_COLOR }),
-    chrome.action.setBadgeText({ text: DEFAULT_BADGE_TEXT }),
+    chrome.action.setBadgeText({ text: "" }),
     chrome.action.setTitle({ title: DEFAULT_ACTION_TITLE }),
   ]);
 }

@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="Page Review">
+  <path fill="#f4512a" d="M24 8h80c8.84 0 16 7.16 16 16v64c0 8.84-7.16 16-16 16h-8v14c0 3.35-3.88 5.21-6.49 3.12L68.1 104H24c-8.84 0-16-7.16-16-16V24C8 15.16 15.16 8 24 8Z"/>
+  <rect width="16" height="56" x="56" y="28" rx="8" fill="#fff"/>
+  <rect width="56" height="16" x="36" y="48" rx="8" fill="#fff"/>
+</svg>

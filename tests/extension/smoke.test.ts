@@ -42,7 +42,7 @@ test("the packaged MV3 extension starts with its icons and local storage", async
         "19": "icons/icon19.png",
         "38": "icons/icon38.png",
       },
-      badgeText: "+",
+      badgeText: "",
       icons: {
         "16": "icons/icon16.png",
         "32": "icons/icon32.png",
