@@ -1,4 +1,4 @@
-import { buildZip, exportJson, exportMarkdown } from "../core/export";
+import { buildZip, exportFilenameStem, exportJson, exportMarkdown } from "../core/export";
 import {
   appendDraftAnnotation,
   editDraftAnnotationComment,
@@ -32,6 +32,7 @@ interface NewAnnotation {
   located?: LocatedTarget;
   screenshot?: CapturedScreenshot;
   screenshotError?: string;
+  screenshotCapturing?: boolean;
 }
 
 declare global {
@@ -118,6 +119,9 @@ class FeedbackController {
   }
 
   private async activate(): Promise<void> {
+    this.host?.remove();
+    this.host = undefined;
+    this.root = undefined;
     const lifecycle = ++this.lifecycle;
     this.active = true;
     this.activatedUrl = location.href;
@@ -201,14 +205,23 @@ class FeedbackController {
       }
     }
     if (changed) {
-      await saveDraft(resolvedDraft);
       this.draft = resolvedDraft;
+      try {
+        await this.persistDraft(resolvedDraft);
+      } catch (error) {
+        this.warning = `Target status changes could not be saved. ${userFacingError(error, "Storage is unavailable.")}`;
+      }
     }
   }
 
   private addListeners(): void {
     document.addEventListener("pointermove", this.onPointerMove, true);
+    document.addEventListener("pointerdown", this.onSelectionActivation, true);
+    document.addEventListener("pointerup", this.onSelectionActivation, true);
+    document.addEventListener("mousedown", this.onSelectionActivation, true);
+    document.addEventListener("mouseup", this.onSelectionActivation, true);
     document.addEventListener("click", this.onDocumentClick, true);
+    document.addEventListener("focusin", this.onFocusIn, true);
     document.addEventListener("keydown", this.onKeyDown, true);
     window.addEventListener("scroll", this.onViewportChange, true);
     window.addEventListener("resize", this.onViewportChange);
@@ -219,7 +232,12 @@ class FeedbackController {
 
   private removeListeners(): void {
     document.removeEventListener("pointermove", this.onPointerMove, true);
+    document.removeEventListener("pointerdown", this.onSelectionActivation, true);
+    document.removeEventListener("pointerup", this.onSelectionActivation, true);
+    document.removeEventListener("mousedown", this.onSelectionActivation, true);
+    document.removeEventListener("mouseup", this.onSelectionActivation, true);
     document.removeEventListener("click", this.onDocumentClick, true);
+    document.removeEventListener("focusin", this.onFocusIn, true);
     document.removeEventListener("keydown", this.onKeyDown, true);
     window.removeEventListener("scroll", this.onViewportChange, true);
     window.removeEventListener("resize", this.onViewportChange);
@@ -249,12 +267,46 @@ class FeedbackController {
     if (target) void this.startElementAnnotation(target);
   };
 
+  private onSelectionActivation = (event: Event): void => {
+    if (!this.selectingElement || this.host?.contains(event.target as Node)) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+  };
+
+  private onFocusIn = (event: FocusEvent): void => {
+    if (!this.selectingElement || !(event.target instanceof Element) || this.host?.contains(event.target)) return;
+    this.candidate = event.target;
+    this.renderMarkers();
+    this.updateSelectionControls();
+  };
+
   private onKeyDown = (event: KeyboardEvent): void => {
-    if (event.key === "Escape" && this.selectingElement) {
+    if (!this.selectingElement) return;
+    if (event.key === "Escape") {
       this.selectingElement = false;
       this.candidate = undefined;
       this.render();
+      return;
     }
+    if (event.key === "Tab") return;
+
+    let next: Element | undefined;
+    if (event.key === "ArrowUp") next = this.candidateParent();
+    if (event.key === "ArrowDown") next = this.candidate?.firstElementChild ?? undefined;
+    if (event.key === "ArrowLeft") next = this.candidate?.previousElementSibling ?? undefined;
+    if (event.key === "ArrowRight") next = this.candidate?.nextElementSibling ?? undefined;
+    if (event.key === "Enter" && this.candidate) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      void this.startElementAnnotation(this.candidate);
+      return;
+    }
+    if (!next) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    this.candidate = next;
+    this.renderMarkers();
+    this.updateSelectionControls();
   };
 
   private onViewportChange = (): void => {
@@ -284,13 +336,13 @@ class FeedbackController {
       id: crypto.randomUUID(), type: "text", context: capturePageContext(),
       target: captured.evidence, located: captured.range,
     };
-    await this.capturePending();
+    this.openPendingEditor();
   }
 
   private async startPageAnnotation(): Promise<void> {
     this.resetEditorState();
     this.pending = { id: crypto.randomUUID(), type: "page", context: capturePageContext() };
-    await this.capturePending();
+    this.openPendingEditor();
   }
 
   private async startElementAnnotation(element: Element): Promise<void> {
@@ -301,13 +353,15 @@ class FeedbackController {
       id: crypto.randomUUID(), type: "element", context: capturePageContext(),
       target: captureElementEvidence(element), located: element,
     };
-    await this.capturePending();
+    this.openPendingEditor();
   }
 
   private async capturePending(): Promise<void> {
     const pending = this.pending;
-    if (!pending) return;
-    this.setStatus("Capturing the visible viewport…");
+    if (!pending || pending.screenshotCapturing) return;
+    pending.screenshotCapturing = true;
+    delete pending.screenshotError;
+    this.render();
     try {
       const screenshot = await this.capture(pending.located);
       if (!this.active || this.pending !== pending) return;
@@ -315,9 +369,17 @@ class FeedbackController {
     } catch (error) {
       if (!this.active || this.pending !== pending) return;
       pending.screenshotError = userFacingError(error, "Screenshot capture failed.");
+      this.attachScreenshot = false;
     }
     if (!this.active || this.pending !== pending) return;
+    pending.screenshotCapturing = false;
+    this.render();
+    requestAnimationFrame(() => this.root?.querySelector<HTMLTextAreaElement>("textarea")?.focus());
+  }
+
+  private openPendingEditor(): void {
     this.status = "";
+    this.statusError = false;
     this.render();
     requestAnimationFrame(() => this.root?.querySelector<HTMLTextAreaElement>("textarea")?.focus());
   }
@@ -326,13 +388,19 @@ class FeedbackController {
     this.selectingElement = true;
     this.pending = undefined;
     this.editingId = undefined;
-    this.candidate = undefined;
+    const activeElement = document.activeElement;
+    this.candidate = activeElement instanceof Element
+      && activeElement !== this.host
+      && activeElement !== document.documentElement
+      ? activeElement
+      : document.body;
     this.render();
   }
 
   private broadenCandidate(): void {
-    if (this.candidate?.parentElement && this.candidate.parentElement !== document.documentElement) {
-      this.candidate = this.candidate.parentElement;
+    const parent = this.candidateParent();
+    if (parent) {
+      this.candidate = parent;
       this.renderMarkers();
       this.updateSelectionControls();
     }
@@ -350,14 +418,22 @@ class FeedbackController {
   private updateSelectionControls(): void {
     const parent = this.root?.querySelector<HTMLButtonElement>('button[data-action="parent"]');
     const child = this.root?.querySelector<HTMLButtonElement>('button[data-action="child"]');
-    if (parent) parent.disabled = !this.candidate?.parentElement || this.candidate.parentElement === document.documentElement;
+    if (parent) parent.disabled = !this.candidateParent();
     if (child) child.disabled = !this.candidate?.firstElementChild;
   }
 
   private async saveEditor(): Promise<void> {
     this.syncEditorInputs();
     const comment = this.editorComment;
-    if (!comment.trim()) return this.setStatus("Enter a comment before saving.", true);
+    if (!comment.trim()) {
+      const textarea = this.root?.querySelector<HTMLTextAreaElement>("#fp-comment");
+      const selection = textarea ? { start: textarea.selectionStart, end: textarea.selectionEnd } : undefined;
+      this.setStatus("Enter a comment before saving.", true);
+      const nextTextarea = this.root?.querySelector<HTMLTextAreaElement>("#fp-comment");
+      nextTextarea?.focus();
+      if (selection) nextTextarea?.setSelectionRange(selection.start, selection.end);
+      return;
+    }
     const now = new Date().toISOString();
 
     if (this.pending) {
@@ -390,7 +466,7 @@ class FeedbackController {
       }
       const nextDraft = appendDraftAnnotation(this.draft, annotation);
       try {
-        await saveDraft(nextDraft);
+        await this.persistDraft(nextDraft);
       } catch (error) {
         if (storedScreenshot) {
           try { await deleteScreenshot(imageKey(this.draft, annotation.id)); }
@@ -404,7 +480,7 @@ class FeedbackController {
     } else if (this.editingId) {
       const editingId = this.editingId;
       const nextDraft = editDraftAnnotationComment(this.draft, editingId, comment, now);
-      await saveDraft(nextDraft);
+      await this.persistDraft(nextDraft);
       this.draft = nextDraft;
       this.editingId = undefined;
     } else {
@@ -418,17 +494,17 @@ class FeedbackController {
     const annotation = this.draft.annotations.find((item) => item.id === id);
     if (!annotation || !confirm("Delete this comment?")) return;
     const key = imageKey(this.draft, id);
-    const previousScreenshot = annotation.screenshot ? await getScreenshot(key) : undefined;
-    if (annotation.screenshot) await deleteScreenshot(key);
     const nextDraft = removeDraftAnnotation(this.draft, id, new Date().toISOString());
-    try {
-      await saveDraft(nextDraft);
-    } catch (error) {
-      await this.restoreScreenshot(key, previousScreenshot);
-      throw error;
-    }
+    await this.persistDraft(nextDraft);
     this.draft = nextDraft;
     this.located.delete(id);
+    if (annotation.screenshot) {
+      try { await deleteScreenshot(key); }
+      catch (error) {
+        console.warn("Could not delete the removed comment's screenshot.", error);
+        return this.setStatus("Comment deleted, but its stored screenshot could not be removed. Clear feedback to retry cleanup.", true);
+      }
+    }
     this.setStatus("Comment deleted.");
   }
 
@@ -436,17 +512,15 @@ class FeedbackController {
     const annotation = this.draft.annotations.find((item) => item.id === id);
     if (!annotation?.screenshot) return;
     const key = imageKey(this.draft, id);
-    const previousScreenshot = await getScreenshot(key);
-    await deleteScreenshot(key);
     const now = new Date().toISOString();
     const nextDraft = setDraftAnnotationScreenshot(this.draft, id, undefined, now);
-    try {
-      await saveDraft(nextDraft);
-    } catch (error) {
-      await this.restoreScreenshot(key, previousScreenshot);
-      throw error;
-    }
+    await this.persistDraft(nextDraft);
     this.draft = nextDraft;
+    try { await deleteScreenshot(key); }
+    catch (error) {
+      console.warn("Could not delete the detached screenshot.", error);
+      return this.setStatus("Screenshot removed from the comment, but its stored image could not be deleted. Clear feedback to retry cleanup.", true);
+    }
     this.setStatus("Screenshot removed.");
   }
 
@@ -470,7 +544,7 @@ class FeedbackController {
         height: screenshot.height,
       }, now);
       try {
-        await saveDraft(nextDraft);
+        await this.persistDraft(nextDraft);
       } catch (error) {
         await this.restoreScreenshot(key, previousScreenshot);
         throw error;
@@ -487,7 +561,7 @@ class FeedbackController {
     const element = target instanceof Range
       ? (target.commonAncestorContainer instanceof Element ? target.commonAncestorContainer : target.commonAncestorContainer.parentElement)
       : target;
-    element?.scrollIntoView({ behavior: "auto", block: "center", inline: "center" });
+    element?.scrollIntoView({ behavior: "instant", block: "center", inline: "center" });
   }
 
   private focusAnnotation(id: string): void {
@@ -512,7 +586,7 @@ class FeedbackController {
       return this.setStatus(screenshots.length ? "Feedback copied. Download is required to include screenshots." : "Feedback copied.");
     }
 
-    const stem = `feedback-${exportedAt.slice(0, 10)}`;
+    const stem = exportFilenameStem(this.draft, exportedAt);
     if (!this.root) throw new Error("The feedback panel is unavailable.");
     if (!screenshots.length) {
       download(`${stem}.${format}`, text, format === "json" ? "application/json" : "text/markdown", this.root);
@@ -564,6 +638,10 @@ class FeedbackController {
 
   private render(): void {
     if (!this.root) return;
+    const previousTextarea = this.root.querySelector<HTMLTextAreaElement>("#fp-comment");
+    const restoreEditorFocus = this.root.activeElement === previousTextarea && previousTextarea
+      ? { start: previousTextarea.selectionStart, end: previousTextarea.selectionEnd }
+      : undefined;
     this.root.querySelector(".fp-panel")?.remove();
     const panel = document.createElement("section");
     panel.className = `fp-panel${this.collapsed ? " collapsed" : ""}`;
@@ -572,11 +650,18 @@ class FeedbackController {
     panel.addEventListener("click", (event) => void this.handlePanelClick(event).catch((error) => {
       this.setStatus(userFacingError(error, "The action failed."), true);
     }));
-    panel.addEventListener("input", (event) => this.handlePanelInput(event));
+    panel.addEventListener("input", (event) => void this.handlePanelInput(event).catch((error) => {
+      this.setStatus(userFacingError(error, "Screenshot capture failed."), true);
+    }));
     panel.addEventListener("change", (event) => void this.handlePanelChange(event).catch((error) => {
       this.setStatus(userFacingError(error, "The setting could not be saved."), true);
     }));
     this.root.append(panel);
+    if (restoreEditorFocus) {
+      const textarea = this.root.querySelector<HTMLTextAreaElement>("#fp-comment");
+      textarea?.focus();
+      textarea?.setSelectionRange(restoreEditorFocus.start, restoreEditorFocus.end);
+    }
     this.renderMarkers();
   }
 
@@ -595,7 +680,7 @@ class FeedbackController {
           <button class="fp-button" data-action="element" ${targetActionsDisabled ? "disabled" : ""}>Select element</button>
           <button class="fp-button wide" data-action="page" ${targetActionsDisabled ? "disabled" : ""}>Add page comment</button>
         </div>
-        ${this.selectingElement ? `<div class="fp-selecting">Move over the page, then click the intended element. Press Escape to cancel.<div class="fp-select-controls"><button class="fp-button" data-action="parent" ${this.candidate?.parentElement ? "" : "disabled"}>Parent</button><button class="fp-button" data-action="child" ${this.candidate?.firstElementChild ? "" : "disabled"}>Child</button><button class="fp-button" data-action="cancel-select">Cancel</button></div></div>` : ""}
+        ${this.selectingElement ? `<div class="fp-selecting">Move over the page and click the intended element. Keyboard: Tab to a focusable element, use arrow keys to move through nearby DOM elements, Enter to select, or Escape to cancel.<div class="fp-select-controls"><button class="fp-button" data-action="parent" ${this.candidateParent() ? "" : "disabled"}>Parent</button><button class="fp-button" data-action="child" ${this.candidate?.firstElementChild ? "" : "disabled"}>Child</button><button class="fp-button" data-action="cancel-select">Cancel</button></div></div>` : ""}
         ${editor}
         <div class="fp-section"><span class="fp-label">Comments</span>${this.listHtml()}</div>
         <div class="fp-section fp-footer">
@@ -612,14 +697,11 @@ class FeedbackController {
   private editorHtml(): string {
     const existing = this.editingId ? this.draft.annotations.find((item) => item.id === this.editingId) : undefined;
     if (!this.pending && !existing) return "";
-    const screenshotLine = this.pending
-      ? (this.pending.screenshot
-        ? `<label class="fp-check"><input id="fp-attach" type="checkbox" ${this.attachScreenshot ? "checked" : ""}> Attach screenshot</label>`
-        : this.pending.screenshotError
-          ? `<p class="fp-status error">Screenshot unavailable: ${escapeHtml(this.pending.screenshotError)}</p>`
-          : `<p class="fp-status">Capturing screenshot…</p>`)
-      : "";
-    const capturePending = Boolean(this.pending && !this.pending.screenshot && !this.pending.screenshotError);
+    const screenshotLine = this.pending ? `
+      <label class="fp-check"><input id="fp-attach" type="checkbox" ${this.attachScreenshot ? "checked" : ""} ${this.pending.screenshotCapturing ? "disabled" : ""}> Attach screenshot</label>
+      ${this.pending.screenshotCapturing ? `<p class="fp-status">Capturing screenshot…</p>` : ""}
+      ${this.pending.screenshotError ? `<p class="fp-status error">Screenshot unavailable: ${escapeHtml(this.pending.screenshotError)}</p>` : ""}` : "";
+    const capturePending = Boolean(this.pending?.screenshotCapturing);
     return `<div class="fp-section"><div class="fp-editor"><label class="fp-label" for="fp-comment">Comment</label><textarea id="fp-comment">${escapeHtml(this.editorComment)}</textarea>${screenshotLine}<div class="fp-editor-actions"><button class="fp-button" data-action="cancel-editor">Cancel</button><button class="fp-button primary" data-action="save" ${capturePending ? "disabled" : ""}>Save comment</button></div></div></div>`;
   }
 
@@ -635,8 +717,8 @@ class FeedbackController {
         </button>
         <div class="fp-row-menu">
           <button data-action="edit" data-id="${escapeHtml(annotation.id)}" aria-label="Edit comment ${index + 1}" ${disabled}>Edit</button>
-          <button data-action="recapture" data-id="${escapeHtml(annotation.id)}" ${disabled}>${annotation.screenshot ? "Recapture" : "Capture"}</button>
-          ${annotation.screenshot ? `<button data-action="remove-shot" data-id="${escapeHtml(annotation.id)}" ${disabled}>Remove image</button>` : ""}
+          <button data-action="recapture" data-id="${escapeHtml(annotation.id)}" aria-label="${annotation.screenshot ? "Recapture" : "Capture"} screenshot for comment ${index + 1}" ${disabled}>${annotation.screenshot ? "Recapture" : "Capture"}</button>
+          ${annotation.screenshot ? `<button data-action="remove-shot" data-id="${escapeHtml(annotation.id)}" aria-label="Remove image from comment ${index + 1}" ${disabled}>Remove image</button>` : ""}
           <button data-action="delete" data-id="${escapeHtml(annotation.id)}" aria-label="Delete comment ${index + 1}" ${disabled}>Delete</button>
         </div>
       </article>`).join("")}</div>`;
@@ -723,10 +805,13 @@ class FeedbackController {
     this.setStatus("Retention setting saved.");
   }
 
-  private handlePanelInput(event: Event): void {
+  private async handlePanelInput(event: Event): Promise<void> {
     const target = event.target;
     if (target instanceof HTMLTextAreaElement && target.id === "fp-comment") this.editorComment = target.value;
-    if (target instanceof HTMLInputElement && target.id === "fp-attach") this.attachScreenshot = target.checked;
+    if (target instanceof HTMLInputElement && target.id === "fp-attach") {
+      this.attachScreenshot = target.checked;
+      if (target.checked && this.pending && !this.pending.screenshot) await this.capturePending();
+    }
   }
 
   private syncEditorInputs(): void {
@@ -750,6 +835,32 @@ class FeedbackController {
     }
   }
 
+  private candidateParent(): Element | undefined {
+    const parent = this.candidate?.parentElement;
+    return parent && parent !== document.documentElement ? parent : undefined;
+  }
+
+  private async persistDraft(draft: Draft): Promise<void> {
+    if (this.writesBlocked) throw new Error("The saved draft must be cleared before it can be replaced.");
+    await saveDraft(draft);
+  }
+
+  showActivationError(error: unknown): void {
+    this.deactivate();
+    this.createHost();
+    if (!this.root) return;
+    const panel = document.createElement("section");
+    panel.className = "fp-panel";
+    panel.setAttribute("aria-label", "Feedback Packet error");
+    panel.innerHTML = `<header class="fp-head"><span class="fp-title">Feedback</span><button data-dismiss aria-label="Dismiss error">×</button></header><div class="fp-body"><p class="fp-status error" role="alert">${escapeHtml(userFacingError(error, "Feedback Packet could not start."))}</p></div>`;
+    panel.querySelector("[data-dismiss]")?.addEventListener("click", () => {
+      this.host?.remove();
+      this.host = undefined;
+      this.root = undefined;
+    });
+    this.root.append(panel);
+  }
+
   private isCurrentLifecycle(lifecycle: number): boolean {
     return this.active && this.lifecycle === lifecycle;
   }
@@ -762,6 +873,13 @@ class FeedbackController {
   }
 }
 
-const controller = window.__feedbackPacketController ?? new FeedbackController();
+const existingController = window.__feedbackPacketController;
+if (!existingController) {
+  document.querySelectorAll("[data-feedback-packet]").forEach((host) => host.remove());
+}
+const controller = existingController ?? new FeedbackController();
 window.__feedbackPacketController = controller;
-void controller.toggle().catch((error) => console.error("Feedback Packet could not toggle feedback mode.", error));
+void controller.toggle().catch((error) => {
+  console.error("Feedback Packet could not toggle feedback mode.", error);
+  controller.showActivationError(error);
+});

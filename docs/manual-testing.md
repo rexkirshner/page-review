@@ -7,7 +7,9 @@ Build the extension, load `dist` as an unpacked extension, and serve the fixture
 - [ ] Select text that crosses the plain, `strong`, hidden `span`, and `em` nodes in the lead paragraph. Confirm the blue preview covers only rendered text and the exported quote/context omit “hidden fixture words.”
 - [ ] Save the text comment and confirm its numbered orange target remains aligned while scrolling.
 - [ ] Enter element-selection mode. Confirm hover preview does not activate links or buttons.
+- [ ] Add temporary `pointerdown` and `mousedown` handlers to a target. Select it and confirm neither handler runs.
 - [ ] Use **Parent** and **Child** on the sample card, then click. Confirm the preview identifies the intended target before saving.
+- [ ] Start element selection from the keyboard. Use Tab to choose a focusable element and the arrow keys to move to its parent, child, and siblings; press Enter and confirm the intended element opens in the editor.
 - [ ] Add a page comment and confirm it has no target marker.
 - [ ] Add at least three comments. Confirm numbers follow list order and stay stable through editing.
 - [ ] Edit one comment and verify its text changes without changing the target.
@@ -38,9 +40,10 @@ Build the extension, load `dist` as an unpacked extension, and serve the fixture
 
 ## Screenshots
 
-- [ ] Create an annotation without checking **Attach screenshot**. Confirm the export contains no image and IndexedDB has no record for it.
-- [ ] Create an annotation with **Attach screenshot**. Confirm the PNG contains the page and one orange target marker, with no panel, editor, numbered saved markers, or blue preview.
+- [ ] Create an annotation without checking **Attach screenshot**. Confirm no viewport capture occurs, the export contains no image, and IndexedDB has no record for it.
+- [ ] Check **Attach screenshot** and confirm capture begins then. Save the annotation and confirm the PNG contains the page and one orange target marker, with no panel, editor, numbered saved markers, or blue preview.
 - [ ] Repeat near the top and after a long scroll. Confirm the marker aligns with the target in both images.
+- [ ] Set `scroll-behavior: smooth` on the fixture, recapture an off-screen target, and confirm capture waits at the target rather than recording mid-scroll.
 - [ ] Repeat at device scale/DPR 1 and 2. Confirm marker position and thickness are correct and the saved dimensions match the PNG.
 - [ ] Start a screenshot capture and immediately switch tabs. Confirm the capture fails with an instruction to keep the annotated tab active and never saves an image of the other tab.
 - [ ] Resize the viewport and confirm the screenshot includes only the visible viewport.
@@ -62,7 +65,8 @@ Build the extension, load `dist` as an unpacked extension, and serve the fixture
 
 ## Boundaries
 
-- [ ] Confirm the extension reports or fails cleanly on `chrome://` and Chrome Web Store pages.
+- [ ] On `chrome://` and Chrome Web Store pages, confirm the action shows a `!` badge and its title explains that Feedback Packet cannot run there.
+- [ ] Leave feedback mode open on a page, reload the unpacked extension, then click its action on the original page. Confirm the stale panel is replaced and only one Feedback Packet panel remains.
 - [ ] Confirm top-level content remains selectable when a cross-origin iframe is present, but iframe contents are not offered as targets.
 - [ ] Confirm the page-owned shadow-root example is not traversed.
 - [ ] Confirm the canvas can be selected only as an element; pixels or drawn text cannot be selected as DOM content.

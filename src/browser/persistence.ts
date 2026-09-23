@@ -35,13 +35,13 @@ export async function saveDraft(draft: Draft): Promise<void> {
 }
 
 export async function clearDraft(draft: Draft): Promise<void> {
-  await deleteDraftScreenshots(draft.id);
   await chrome.storage.local.remove(draftKey(draft.pageKey));
+  await deleteDraftScreenshots(draft.id);
 }
 
 export async function clearStoredDraft(key: string, storedDraftId?: string): Promise<void> {
-  if (storedDraftId) await deleteDraftScreenshots(storedDraftId);
   await chrome.storage.local.remove(draftKey(key));
+  if (storedDraftId) await deleteDraftScreenshots(storedDraftId);
 }
 
 export function createDraft(key: string, now = new Date().toISOString()): Draft {

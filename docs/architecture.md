@@ -19,8 +19,8 @@ The service worker in `src/background/index.ts` has only three jobs: inject feed
 1. A toolbar click grants temporary `activeTab` access and injects `content.js`.
 2. The content script normalizes the page URL and loads its draft. Loading applies migrations and retention.
 3. Text or element evidence is captured synchronously from the rendered page. Page context is captured at the same time.
-4. The shadow host is hidden for two animation frames. The service worker verifies that the requesting tab is still active before and after capturing the active viewport; a tab switch fails the capture rather than returning another page. The content script draws an orange marker onto the resulting bitmap using `bitmap size / CSS viewport size` on each axis. This accounts for device pixel ratio and browser scaling without assuming they are identical.
-5. The editor opens. The marked image remains only in memory unless **Attach screenshot** is checked.
+4. The editor opens. If **Attach screenshot** is checked, the shadow host is hidden for two animation frames. The service worker verifies that the requesting tab is still active before and after capturing the active viewport; a tab switch fails the capture rather than returning another page. The content script draws an orange marker onto the resulting bitmap using `bitmap size / CSS viewport size` on each axis. This accounts for device pixel ratio and browser scaling without assuming they are identical.
+5. The marked image remains only in memory until the comment is saved, and is discarded if attachment is unchecked or the editor is canceled.
 6. Draft JSON is written through `chrome.storage.local`. Attached PNG blobs are written through the service worker to IndexedDB under `<draft-id>:<annotation-id>`.
 7. Export is generated from captured evidence only. The page is never re-scraped at export time.
 
@@ -49,9 +49,9 @@ Version 0 drafts are migrated explicitly by moving `updatedAt` to `lastEditedAt`
 
 ## Target re-location
 
-Text first uses the serialized DOM range and confirms the exact quote, surrounding context, and containing-element evidence. If the path no longer works, a fallback accepts only one candidate that also matches those complementary signals. Hidden text is excluded. This supports ranges spanning inline elements without wrapping or mutating page nodes.
+Text first uses the serialized DOM range and confirms the exact quote, surrounding context, and containing-element evidence. If the path no longer works, a fallback accepts only one candidate that also matches those complementary signals and the captured section heading when one is available. Hidden text is excluded. This supports ranges spanning inline elements without wrapping or mutating page nodes.
 
-Elements first try the captured CSS path, then score same-tag candidates using ID, stable classes, selected attributes, accessible name, and visible text. The match must exceed a confidence threshold and be meaningfully better than the runner-up. A target with no complementary identifying evidence is unresolved rather than attached using the CSS path alone.
+Elements first try the captured CSS path, then score same-tag candidates using ID, stable classes, selected attributes, accessible name, and visible text. When the strongest candidates are otherwise ambiguous, captured ancestor evidence is used as a tie-breaker. The match must exceed a confidence threshold and be meaningfully better than the runner-up. A target with no complementary identifying evidence is unresolved rather than attached using the CSS path alone.
 
 Resolved targets are displayed with fixed overlays inside a closed extension shadow root. Page scripts cannot inspect the panel's comments or transient download elements, and the page DOM is not wrapped or rewritten.
 

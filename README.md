@@ -4,6 +4,8 @@ Feedback Packet is a local-first Chrome extension for attaching comments to sele
 
 The extension does not use a backend or call an LLM. Drafts and screenshots remain in the browser until they expire, the extension is removed, or the user clears them.
 
+Feedback Packet captures page content and context only after you choose an annotation target. This can include the page URL, nearby text, element attributes, and the visible viewport. Review [Privacy](PRIVACY.md) before using it on sensitive pages.
+
 ## Install the unpacked extension
 
 Requirements: Node.js 20 or newer and a current version of Chrome.
@@ -28,8 +30,9 @@ After rebuilding and reloading the unpacked extension, refresh any pages that al
 
 - Drag over page text, then choose **Comment on selection**.
 - Choose **Select element**, hover the page, use **Parent** or **Child** if needed, then click the intended element.
+- For keyboard targeting, choose **Select element**, use Tab or the arrow keys to choose a DOM element, then press Enter.
 - Choose **Add page comment** for feedback that has no rendered target.
-- Screenshots are off by default. The visible viewport is captured when a new target is selected, before the editor opens, and is retained only when **Attach screenshot** is checked.
+- Screenshots are off by default. The visible viewport is captured only when **Attach screenshot** is checked, and the image is retained when the comment is saved.
 - Choose a saved comment to scroll to and flash its target. A target is marked unresolved when it cannot be matched confidently.
 - Download Markdown or JSON. When screenshots are attached, the download is a ZIP containing the feedback file and one PNG per attached annotation.
 
@@ -40,9 +43,20 @@ After rebuilding and reloading the unpacked extension, refresh any pages that al
 ```sh
 npm run check   # TypeScript
 npm test        # Pure-core Node tests
+npm run test:browser # DOM capture and relocation tests in Chromium
+npm run test:extension # Packaged extension smoke test in Chromium
 npm run build   # MV3 bundles in dist/
+npm run package:release # Source-map-free release ZIP in release/
 npm run verify  # All of the above
 ```
+
+Install the browser used by the automated DOM tests once after `npm ci`:
+
+```sh
+npx playwright install chromium
+```
+
+For a package without source maps, use `npm run build:release`.
 
 Serve the test fixture from the repository root, then open `/fixture/`:
 
@@ -59,6 +73,8 @@ The fixture includes inline formatting, nested elements, duplicate text, mutable
 - `storage`: stores versioned draft metadata in `chrome.storage.local`.
 
 There are no persistent host permissions. Screenshot blobs use extension-owned IndexedDB rather than the 10 MB default `storage.local` quota, so `unlimitedStorage` is not requested. See [Architecture](docs/architecture.md) for the decision and current Chrome references.
+
+The complete local data-handling policy is in [Privacy](PRIVACY.md).
 
 ## Limitations
 

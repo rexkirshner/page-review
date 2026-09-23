@@ -84,15 +84,16 @@ export function summarizeElement(element: Element): ElementSummary {
 }
 
 function fingerprint(element: Element): ElementFingerprint {
-  const summary = summarizeElement(element);
   const result: ElementFingerprint = {
-    tag: summary.tag,
-    classes: summary.classes,
-    attributes: summary.attributes,
+    tag: element.tagName.toLowerCase(),
+    classes: Array.from(element.classList).filter(looksStable).slice(0, 8),
+    attributes: evidenceAttributes(element),
   };
-  if (summary.id) result.id = summary.id;
-  if (summary.text) result.text = summary.text;
-  if (summary.accessibleName) result.accessibleName = summary.accessibleName;
+  if (element.id && looksStable(element.id)) result.id = element.id;
+  const text = cleanText(renderedText(element));
+  if (text) result.text = text;
+  const name = accessibleName(element);
+  if (name) result.accessibleName = name;
   return result;
 }
 
@@ -165,14 +166,10 @@ function visibleRangeModel(range: Range): { text: string; start: number; end: nu
   };
 }
 
-function visibleRangeText(range: Range): string {
-  const model = visibleRangeModel(range);
-  return model.text.slice(model.start, model.end);
-}
-
-function surroundingText(range: Range): { before: string; after: string } {
+function visibleRangeEvidence(range: Range): { exactQuote: string; before: string; after: string } {
   const model = visibleRangeModel(range);
   return {
+    exactQuote: model.text.slice(model.start, model.end),
     before: model.text.slice(Math.max(0, model.start - CONTEXT_LENGTH), model.start),
     after: model.text.slice(model.end, model.end + CONTEXT_LENGTH),
   };
@@ -211,12 +208,12 @@ export function captureTextEvidence(selection: Selection): { evidence: TextEvide
   const range = selection.getRangeAt(0).cloneRange();
   if (range.startContainer.getRootNode() !== document || range.endContainer.getRootNode() !== document) return undefined;
   if (!document.body.contains(range.startContainer) || !document.body.contains(range.endContainer)) return undefined;
-  const exactQuote = visibleRangeText(range);
+  const visibleEvidence = visibleRangeEvidence(range);
+  const exactQuote = visibleEvidence.exactQuote;
   if (!exactQuote.trim()) return undefined;
   const startElement = elementForNode(range.startContainer);
   const endElement = elementForNode(range.endContainer);
   const common = commonElement(range);
-  const surrounding = surroundingText(range);
   const evidence: TextEvidence = {
     kind: "text",
     exactQuote,
@@ -231,8 +228,8 @@ export function captureTextEvidence(selection: Selection): { evidence: TextEvide
       end: summarizeElement(endElement),
       common: summarizeElement(common),
     },
-    before: surrounding.before,
-    after: surrounding.after,
+    before: visibleEvidence.before,
+    after: visibleEvidence.after,
     rects: deduplicateRects(Array.from(range.getClientRects()).map(rect)),
   };
   const heading = sectionContext(range, startElement);
@@ -261,6 +258,23 @@ function hasElementSignals(evidence: ElementEvidence): boolean {
   return Boolean(evidence.id || evidence.classes.length || Object.keys(evidence.attributes).length || evidence.text || evidence.accessibleName);
 }
 
+function ancestorContextScore(evidence: ElementEvidence, element: Element): number {
+  if (!evidence.ancestors.length) return 0;
+  const candidateAncestors: ElementFingerprint[] = [];
+  let current = element.parentElement;
+  while (current && candidateAncestors.length < 8) {
+    candidateAncestors.push(fingerprint(current));
+    current = current.parentElement;
+  }
+  if (!candidateAncestors.length) return 0;
+
+  const scores = evidence.ancestors.map((expected) => {
+    const best = Math.max(0, ...candidateAncestors.map((candidate) => scoreElementCandidate(expected, candidate)));
+    return Math.max(0, (best - 0.2) / 0.8);
+  });
+  return scores.reduce((total, score) => total + score, 0) / scores.length;
+}
+
 export function locateElement(evidence: ElementEvidence): Element | undefined {
   let exactMatches: Element[] = [];
   try { exactMatches = Array.from(document.querySelectorAll(evidence.cssPath)); } catch { /* Invalid paths are unresolved. */ }
@@ -268,19 +282,39 @@ export function locateElement(evidence: ElementEvidence): Element | undefined {
   if (exact && exactMatches.length === 1 && hasElementSignals(evidence)
     && scoreElementCandidate(evidence, fingerprint(exact)) >= 0.78) return exact;
 
-  const candidates = Array.from(document.getElementsByTagName(evidence.tag)).slice(0, 1000)
-    .map((element) => ({ element, score: scoreElementCandidate(evidence, fingerprint(element)) }))
-    .sort((a, b) => b.score - a.score);
-  const best = candidates[0];
-  const second = candidates[1];
-  if (!best || !hasElementSignals(evidence) || best.score < 0.86 || (second && best.score - second.score < 0.08)) return undefined;
-  return best.element;
+  let best: { element: Element; score: number } | undefined;
+  let second: { element: Element; score: number } | undefined;
+  const contenders: Array<{ element: Element; score: number }> = [];
+  for (const element of Array.from(document.getElementsByTagName(evidence.tag)).slice(0, 1000)) {
+    const candidate = { element, score: scoreElementCandidate(evidence, fingerprint(element)) };
+    if (candidate.score >= 0.78) contenders.push(candidate);
+    if (!best || candidate.score > best.score) {
+      second = best;
+      best = candidate;
+    } else if (!second || candidate.score > second.score) {
+      second = candidate;
+    }
+  }
+  if (!best || !hasElementSignals(evidence) || best.score < 0.86) return undefined;
+  if (!second || best.score - second.score >= 0.08) return best.element;
+  if (!evidence.ancestors.length) return undefined;
+
+  const ranked = contenders
+    .map((candidate) => ({ ...candidate, rank: candidate.score + 0.1 * ancestorContextScore(evidence, candidate.element) }))
+    .sort((left, right) => right.rank - left.rank);
+  const contextualBest = ranked[0];
+  const contextualSecond = ranked[1];
+  if (!contextualBest || contextualBest.score < 0.86
+    || (contextualSecond && contextualBest.rank - contextualSecond.rank < 0.08)) return undefined;
+  return contextualBest.element;
 }
 
-function textRangeMatchesEvidence(range: Range, evidence: TextEvidence): boolean {
-  if (visibleRangeText(range) !== evidence.exactQuote) return false;
-  const surrounding = surroundingText(range);
-  if (surrounding.before !== evidence.before || surrounding.after !== evidence.after) return false;
+function textRangeMatchesEvidence(range: Range, evidence: TextEvidence, matchSectionContext = false): boolean {
+  const visibleEvidence = visibleRangeEvidence(range);
+  if (visibleEvidence.exactQuote !== evidence.exactQuote) return false;
+  if (visibleEvidence.before !== evidence.before || visibleEvidence.after !== evidence.after) return false;
+  if (matchSectionContext && evidence.sectionContext
+    && sectionContext(range, elementForNode(range.startContainer)) !== evidence.sectionContext) return false;
   return scoreElementCandidate(
     evidence.containingElements.common,
     fingerprint(commonElement(range)),
@@ -336,7 +370,7 @@ export function locateText(evidence: TextEvidence): Range | undefined {
     const range = document.createRange();
     range.setStart(startNode, start - startBase);
     range.setEnd(endNode, end - endBase);
-    return textRangeMatchesEvidence(range, evidence) ? [range] : [];
+    return textRangeMatchesEvidence(range, evidence, true) ? [range] : [];
   });
   return candidates.length === 1 ? candidates[0] : undefined;
 }

@@ -2,8 +2,13 @@ import type { Rect } from "../core/model";
 import { projectRectToBitmap } from "../core/screenshot-geometry";
 import type { ExtensionRequest, ExtensionResponse } from "../shared/messages";
 
-function send(request: ExtensionRequest): Promise<ExtensionResponse> {
-  return chrome.runtime.sendMessage(request) as Promise<ExtensionResponse>;
+async function send(request: ExtensionRequest): Promise<ExtensionResponse> {
+  const response: unknown = await chrome.runtime.sendMessage(request);
+  if (typeof response !== "object" || response === null || !("ok" in response)
+    || typeof (response as { ok?: unknown }).ok !== "boolean") {
+    throw new Error("The extension did not return a valid response. Refresh this page and try again.");
+  }
+  return response as ExtensionResponse;
 }
 
 function loadImage(dataUrl: string): Promise<HTMLImageElement> {

@@ -97,6 +97,17 @@ export function exportJson(draft: Draft, exportedAt: string): string {
   return `${JSON.stringify(toFeedbackExport(draft, exportedAt), null, 2)}\n`;
 }
 
+export function exportFilenameStem(draft: Draft, exportedAt: string): string {
+  const sourceUrl = draft.annotations[0]?.context.url ?? draft.pageKey;
+  let host = "page";
+  try {
+    host = new URL(sourceUrl).hostname || "page";
+  } catch { /* Use the generic fallback for invalid legacy URLs. */ }
+  const safeHost = host.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 60) || "page";
+  const timestamp = exportedAt.replace(/[-:]/g, "").replace(/\.\d{3}Z$/, "Z").replace("T", "-");
+  return `feedback-${safeHost}-${timestamp}`;
+}
+
 export function buildZip(feedbackFilename: string, feedbackText: string, screenshots: Record<string, Uint8Array>): Uint8Array {
   const entries: Record<string, Uint8Array> = { [feedbackFilename]: strToU8(feedbackText) };
   for (const [filename, bytes] of Object.entries(screenshots)) entries[filename] = bytes;

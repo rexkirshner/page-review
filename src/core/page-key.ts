@@ -6,7 +6,10 @@ export function pageKey(input: string): string {
 
   for (const [key, value] of url.searchParams) {
     const lower = key.toLowerCase();
-    if (lower.startsWith("utm_") || lower === "fbclid" || lower === "gclid") continue;
+    const tracking = TRACKING_PARAMS.some((pattern) => pattern.endsWith("*")
+      ? lower.startsWith(pattern.slice(0, -1))
+      : lower === pattern);
+    if (tracking) continue;
     kept.push([key, value]);
   }
 

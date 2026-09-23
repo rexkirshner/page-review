@@ -9,7 +9,7 @@ import {
   setDraftAnnotationScreenshot,
 } from "../src/core/draft";
 import { userFacingError } from "../src/core/errors";
-import { buildZip, exportJson, exportMarkdown } from "../src/core/export";
+import { buildZip, exportFilenameStem, exportJson, exportMarkdown } from "../src/core/export";
 import { buildCssPath, cssEscape, looksStable, scoreElementCandidate } from "../src/core/locator";
 import { readDraft } from "../src/core/migrations";
 import { DRAFT_SCHEMA_VERSION, type Draft } from "../src/core/model";
@@ -82,6 +82,11 @@ test("page keys remove only the documented tracking parameters", () => {
   );
   assert.equal(pageKey("https://example.com/a?campaign=1#one"), "https://example.com/a?campaign=1#one");
   assert.notEqual(pageKey("https://example.com/a#one"), pageKey("https://example.com/a#two"));
+  for (const parameter of TRACKING_PARAMS) {
+    const key = parameter.endsWith("*") ? `${parameter.slice(0, -1)}example` : parameter;
+    assert.equal(pageKey(`https://example.com/a?keep=1&${key}=remove`), "https://example.com/a?keep=1");
+  }
+  assert.equal(pageKey("https://example.com/a?utm=keep&my_fbclid=keep"), "https://example.com/a?utm=keep&my_fbclid=keep");
 });
 
 test("locator helpers keep stable identifiers and score complementary evidence", () => {
@@ -234,6 +239,15 @@ test("draft migration handles v0 and rejects corrupt or future drafts", () => {
   }).status, "corrupt");
   assert.equal(readDraft({ ...draft, schemaVersion: 1.5 }).status, "corrupt");
   assert.equal(readDraft({ ...draft, schemaVersion: Number.POSITIVE_INFINITY }).status, "corrupt");
+  assert.equal(readDraft({ ...draft, id: "draft:other" }).status, "corrupt");
+  assert.equal(readDraft({
+    ...draft,
+    annotations: [{
+      ...draft.annotations[0]!,
+      id: "../feedback",
+      screenshot: { ...draft.annotations[0]!.screenshot!, filename: "../feedback.png" },
+    }],
+  }).status, "corrupt");
   assert.equal(readDraft({ schemaVersion: 99 }).status, "unsupported");
   assert.equal(readDraft(undefined).status, "missing");
 });
@@ -302,4 +316,16 @@ test("ZIP export contains the feedback file and referenced PNG", () => {
   assert.deepEqual(Object.keys(zip).sort(), ["annotation-1.png", "feedback.md"]);
   assert.equal(strFromU8(zip["feedback.md"]!), "# Feedback\n");
   assert.deepEqual(zip["annotation-1.png"]!, bytes);
+});
+
+test("export filenames distinguish hosts and repeated exports", () => {
+  const draft = sampleDraft();
+  assert.equal(
+    exportFilenameStem(draft, "2026-09-19T12:34:56.789Z"),
+    "feedback-example-com-20260919-123456Z",
+  );
+  assert.notEqual(
+    exportFilenameStem(draft, "2026-09-19T12:34:56.789Z"),
+    exportFilenameStem(draft, "2026-09-19T12:34:57.000Z"),
+  );
 });

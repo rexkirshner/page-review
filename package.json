@@ -11,14 +11,20 @@
   "type": "module",
   "scripts": {
     "build": "node scripts/build.mjs",
-    "check": "tsc --noEmit",
-    "test": "tsx --test tests/**/*.test.ts",
-    "verify": "npm run check && npm test && npm run build"
+    "build:release": "node scripts/build.mjs --release",
+    "package:release": "npm run build:release && node scripts/package-release.mjs",
+    "check": "tsc --noEmit && tsc -p tsconfig.core.json",
+    "test": "tsx --test tests/core.test.ts",
+    "test:browser": "playwright test tests/browser/dom-evidence.test.ts --workers=1",
+    "test:extension": "npm run build && playwright test tests/extension/*.test.ts --workers=1",
+    "test:release": "npm run package:release && tsx --test tests/release.test.ts",
+    "verify": "npm run check && npm test && npm run test:browser && npm run test:extension && npm run test:release"
   },
   "dependencies": {
     "fflate": "^0.8.2"
   },
   "devDependencies": {
+    "@playwright/test": "^1.63.0",
     "@types/chrome": "^0.1.1",
     "@types/node": "^24.5.2",
     "esbuild": "^0.25.10",

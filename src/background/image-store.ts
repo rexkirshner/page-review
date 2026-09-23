@@ -77,11 +77,12 @@ export async function deleteDraftImages(draftId: string): Promise<void> {
   await new Promise<void>((resolve, reject) => {
     const tx = database.transaction(STORE, "readwrite");
     const store = tx.objectStore(STORE);
-    const request = store.openCursor();
+    const prefix = `${draftId}:`;
+    const request = store.openCursor(IDBKeyRange.bound(prefix, `${prefix}\uffff`));
     request.onsuccess = () => {
       const cursor = request.result;
       if (!cursor) return;
-      if (String(cursor.key).startsWith(`${draftId}:`)) cursor.delete();
+      cursor.delete();
       cursor.continue();
     };
     tx.oncomplete = () => { database.close(); resolve(); };

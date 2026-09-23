@@ -43,6 +43,10 @@ function isTimestamp(value: unknown): value is string {
   return typeof value === "string" && Number.isFinite(Date.parse(value));
 }
 
+function isSafeId(value: unknown): value is string {
+  return typeof value === "string" && /^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/.test(value);
+}
+
 function isRect(value: unknown): boolean {
   return isObject(value) && isNumber(value.x) && isNumber(value.y)
     && isNumber(value.width) && value.width >= 0
@@ -85,7 +89,7 @@ function isTarget(value: unknown): boolean {
 function isAnnotation(value: unknown): boolean {
   if (!isObject(value)) return false;
   const type = String(value.type);
-  return typeof value.id === "string" && value.id.length > 0 && typeof value.comment === "string"
+  return isSafeId(value.id) && typeof value.comment === "string"
     && ["page", "text", "element"].includes(type)
     && isTimestamp(value.createdAt) && isTimestamp(value.updatedAt)
     && (value.resolution === "resolved" || value.resolution === "unresolved")
@@ -106,7 +110,7 @@ function hasUniqueAnnotationIds(annotations: unknown[]): boolean {
 function validV1(value: unknown): value is Draft {
   if (!isObject(value)) return false;
   return value.schemaVersion === DRAFT_SCHEMA_VERSION
-    && typeof value.id === "string" && value.id.length > 0
+    && isSafeId(value.id)
     && typeof value.pageKey === "string" && value.pageKey.length > 0
     && isTimestamp(value.createdAt)
     && isTimestamp(value.lastEditedAt)
