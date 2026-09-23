@@ -1,30 +1,32 @@
-# Feedback Packet
+# Page Review
 
-Feedback Packet is a local-first Chrome extension for attaching comments to selected text, rendered elements, or an entire page. It exports Markdown or JSON with the captured page context and several complementary DOM locators. Optional screenshots are packaged with the feedback in a ZIP.
+Page Review is a local-first Chrome extension for attaching comments to selected text, rendered elements, or an entire page. It exports Markdown or JSON with the captured page context and several complementary DOM locators. Optional screenshots are packaged with the feedback in a ZIP.
 
 The extension does not use a backend or call an LLM. Drafts and screenshots remain in the browser until they expire, the extension is removed, or the user clears them.
 
-Feedback Packet captures page content and context only after you choose an annotation target. This can include the page URL, nearby text, element attributes, and the visible viewport. Review [Privacy](PRIVACY.md) before using it on sensitive pages.
+Page Review captures page content and context only after you choose an annotation target. This can include the page URL, nearby text, element attributes, and the visible viewport. Review [Privacy](PRIVACY.md) before using it on sensitive pages.
 
-## Install the unpacked extension
+## Install the local development extension
 
 Requirements: Node.js 20 or newer and a current version of Chrome.
 
 ```sh
 npm ci
-npm run build
+npm run build:dev
 ```
 
 Then:
 
 1. Open `chrome://extensions`.
 2. Turn on **Developer mode**.
-3. Select **Load unpacked** and choose the generated `dist` directory.
-4. Pin **Feedback Packet** if desired.
+3. Select **Load unpacked** and choose the generated `dist/dev` directory.
+4. Pin **Page Review Dev** if desired. Its violet **DEV** icon and panel title distinguish it from the Store build.
 
-Click the toolbar action on an ordinary web page to turn feedback mode on for that tab. Refreshing or navigating turns it off; clicking the action again restores that page's saved draft.
+Chrome gives this unpacked directory its own extension ID, so its `chrome.storage.local` and IndexedDB data are separate from an installed Chrome Web Store copy. Keep loading the same `dist/dev` path so the development identity remains stable.
 
-After rebuilding and reloading the unpacked extension, refresh any pages that already had feedback mode open. Chrome invalidates their old content-script context when an extension is reloaded.
+Click the toolbar action on an ordinary web page to turn review mode on for that tab. Refreshing or navigating turns it off; clicking the action again restores that page's saved draft.
+
+After a code change, run `npm run build:dev`, click **Reload** on the **Page Review Dev** card in `chrome://extensions`, and refresh any page that already had review mode open. Chrome invalidates its old content-script context when an extension is reloaded.
 
 ## Use
 
@@ -45,7 +47,8 @@ npm run check   # TypeScript
 npm test        # Pure-core Node tests
 npm run test:browser # DOM capture and relocation tests in Chromium
 npm run test:extension # Packaged extension smoke test in Chromium
-npm run build   # MV3 bundles in dist/
+npm run build:dev # Unpacked local build in dist/dev/ (source maps, distinct identity)
+npm run build:release # Store build in dist/release/ (no source maps or dev markers)
 npm run package:release # Source-map-free release ZIP in release/
 npm run verify  # All of the above
 ```
@@ -56,7 +59,7 @@ Install the browser used by the automated DOM tests once after `npm ci`:
 npx playwright install chromium
 ```
 
-For a package without source maps, use `npm run build:release`.
+`npm run build` is an alias for `npm run build:dev`. Do not upload `dist/dev`; `npm run package:release` is the only supported way to create the Store ZIP.
 
 Serve the test fixture from the repository root, then open `/fixture/`:
 
@@ -69,7 +72,7 @@ The fixture includes inline formatting, nested elements, duplicate text, mutable
 ## Permissions
 
 - `activeTab`: temporarily accesses only the tab where the user clicks the toolbar action; it is also required by `captureVisibleTab`.
-- `scripting`: injects feedback mode after that click.
+- `scripting`: injects review mode after that click.
 - `storage`: stores versioned draft metadata in `chrome.storage.local`.
 
 There are no persistent host permissions. Screenshot blobs use extension-owned IndexedDB rather than the 10 MB default `storage.local` quota, so `unlimitedStorage` is not requested. See [Architecture](docs/architecture.md) for the decision and current Chrome references.
@@ -88,6 +91,8 @@ The complete local data-handling policy is in [Privacy](PRIVACY.md).
 ## Architecture and formats
 
 [Architecture](docs/architecture.md) describes module boundaries, the data flow, schema and format versions, storage, re-location confidence, and non-obvious decisions.
+
+Chrome Web Store materials are indexed in [Store submission materials](store/README.md).
 
 ## Contributing
 

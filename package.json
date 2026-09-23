@@ -1,5 +1,5 @@
 {
-  "name": "feedback-packet",
+  "name": "page-review",
   "version": "0.1.0",
   "description": "A local-first Chrome extension for annotating rendered web pages and exporting implementation-ready feedback.",
   "author": "Rex Kirshner",
@@ -10,15 +10,20 @@
   },
   "type": "module",
   "scripts": {
-    "build": "node scripts/build.mjs",
+    "build": "npm run build:dev",
+    "build:dev": "node scripts/build.mjs --dev",
+    "build:privacy": "node scripts/build-privacy-page.mjs",
     "build:release": "node scripts/build.mjs --release",
+    "assets:store": "npm run build:release && node scripts/capture-store-assets.mjs",
     "package:release": "npm run build:release && node scripts/package-release.mjs",
     "check": "tsc --noEmit && tsc -p tsconfig.core.json",
     "test": "tsx --test tests/core.test.ts",
     "test:browser": "playwright test tests/browser/dom-evidence.test.ts --workers=1",
-    "test:extension": "npm run build:release && playwright test tests/extension/*.test.ts --workers=1",
+    "test:channels": "npm run build:dev && npm run build:release && tsx --test tests/channels.test.ts",
+    "test:extension": "npm run build:dev && npm run build:release && playwright test tests/extension/*.test.ts --workers=1",
     "test:release": "npm run package:release && tsx --test tests/release.test.ts",
-    "verify": "npm run check && npm test && npm run test:browser && npm run test:extension && npm run test:release"
+    "test:store": "tsx --test tests/store-assets.test.ts",
+    "verify": "npm run check && npm test && npm run test:browser && npm run test:channels && npm run test:extension && npm run test:store && npm run test:release"
   },
   "dependencies": {
     "fflate": "^0.8.2"

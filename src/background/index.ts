@@ -1,8 +1,9 @@
 import { deleteDraftImages, deleteImage, getImage, putImage } from "./image-store";
 import type { ExtensionRequest, ExtensionResponse } from "../shared/messages";
+import { extensionDisplayName } from "../shared/build";
 
 const ACTIVE_TAB_MESSAGE = "Keep the annotated tab active while its screenshot is captured.";
-const DEFAULT_ACTION_TITLE = "Toggle feedback mode";
+const DEFAULT_ACTION_TITLE = `Toggle ${extensionDisplayName}`;
 const DEFAULT_BADGE_TEXT = "+";
 const DEFAULT_BADGE_COLOR = "#f05a35";
 
@@ -26,7 +27,7 @@ async function showActionError(tabId: number): Promise<void> {
   await Promise.all([
     chrome.action.setBadgeBackgroundColor({ tabId, color: "#9a311f" }),
     chrome.action.setBadgeText({ tabId, text: "!" }),
-    chrome.action.setTitle({ tabId, title: "Feedback Packet cannot run on this page." }),
+    chrome.action.setTitle({ tabId, title: `${extensionDisplayName} cannot run on this page.` }),
   ]);
 }
 
@@ -54,8 +55,8 @@ chrome.action.onClicked.addListener(async (tab) => {
     await clearActionError(tab.id);
   } catch (error) {
     try { await showActionError(tab.id); }
-    catch (actionError) { console.warn("Feedback Packet could not update its action state.", actionError); }
-    console.warn("Feedback Packet cannot run on this page.", error);
+    catch (actionError) { console.warn("Page Review could not update its action state.", actionError); }
+    console.warn("Page Review cannot run on this page.", error);
   }
 });
 

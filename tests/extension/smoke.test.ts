@@ -2,7 +2,7 @@ import { chromium, expect, test } from "@playwright/test";
 import path from "node:path";
 
 test("the packaged MV3 extension starts with its icons and local storage", async () => {
-  const extensionPath = path.resolve("dist");
+  const extensionPath = path.resolve("dist/release");
   const context = await chromium.launchPersistentContext("", {
     channel: "chromium",
     headless: true,
@@ -24,6 +24,7 @@ test("the packaged MV3 extension starts with its icons and local storage", async
       const stored = await chrome.storage.local.get(key);
       await chrome.storage.local.remove(key);
       return {
+        name: manifest.name,
         manifestVersion: manifest.manifest_version,
         actionTitle: manifest.action?.default_title,
         actionIcons: manifest.action?.default_icon,
@@ -34,8 +35,9 @@ test("the packaged MV3 extension starts with its icons and local storage", async
     });
 
     expect(result).toEqual({
+      name: "Page Review",
       manifestVersion: 3,
-      actionTitle: "Toggle feedback mode",
+      actionTitle: "Toggle Page Review",
       actionIcons: {
         "19": "icons/icon19.png",
         "38": "icons/icon38.png",

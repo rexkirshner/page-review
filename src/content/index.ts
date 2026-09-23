@@ -13,6 +13,7 @@ import { deduplicateRects } from "../core/screenshot-geometry";
 import { captureElementEvidence, capturePageContext, captureTextEvidence, locateElement, locateText } from "../browser/dom-evidence";
 import { clearDraft, clearStoredDraft, createDraft, loadDraft, loadSettings, saveDraft, saveSettings } from "../browser/persistence";
 import { captureVisibleScreenshot, deleteScreenshot, getScreenshot, putScreenshot } from "../browser/screenshot";
+import { extensionDisplayName, panelTitle } from "../shared/build";
 import { styles } from "./styles";
 
 type LocatedTarget = Element | Range;
@@ -37,7 +38,7 @@ interface NewAnnotation {
 
 declare global {
   interface Window {
-    __feedbackPacketController?: FeedbackController;
+    __pageReviewController?: FeedbackController;
   }
 }
 
@@ -181,7 +182,7 @@ class FeedbackController {
 
   private createHost(): void {
     this.host = document.createElement("div");
-    this.host.dataset.feedbackPacket = "";
+    this.host.dataset.pageReview = "";
     this.root = this.host.attachShadow({ mode: "closed" });
     const style = document.createElement("style");
     style.textContent = styles;
@@ -587,7 +588,7 @@ class FeedbackController {
     }
 
     const stem = exportFilenameStem(this.draft, exportedAt);
-    if (!this.root) throw new Error("The feedback panel is unavailable.");
+    if (!this.root) throw new Error("The review panel is unavailable.");
     if (!screenshots.length) {
       download(`${stem}.${format}`, text, format === "json" ? "application/json" : "text/markdown", this.root);
       return this.setStatus("Feedback downloaded.");
@@ -645,7 +646,7 @@ class FeedbackController {
     this.root.querySelector(".fp-panel")?.remove();
     const panel = document.createElement("section");
     panel.className = `fp-panel${this.collapsed ? " collapsed" : ""}`;
-    panel.setAttribute("aria-label", "Feedback Packet");
+    panel.setAttribute("aria-label", extensionDisplayName);
     panel.innerHTML = this.panelHtml();
     panel.addEventListener("click", (event) => void this.handlePanelClick(event).catch((error) => {
       this.setStatus(userFacingError(error, "The action failed."), true);
@@ -669,10 +670,10 @@ class FeedbackController {
     const count = this.draft.annotations.length;
     const targetActionActive = Boolean(this.pending || this.editingId || this.selectingElement);
     const targetActionsDisabled = this.writesBlocked || targetActionActive;
-    if (this.collapsed) return `<header class="fp-head"><span class="fp-title">Feedback</span><span class="fp-count">${count}</span><button data-action="collapse" aria-label="Expand panel">+</button><button data-action="off" aria-label="Turn off feedback mode">×</button></header>`;
+    if (this.collapsed) return `<header class="fp-head"><span class="fp-title">${panelTitle}</span><span class="fp-count">${count}</span><button data-action="collapse" aria-label="Expand panel">+</button><button data-action="off" aria-label="Turn off review mode">×</button></header>`;
     const editor = this.editorHtml();
     return `
-      <header class="fp-head"><span class="fp-title">Feedback</span><span class="fp-count">${count}</span><button data-action="collapse" aria-label="Collapse panel">−</button><button data-action="off" aria-label="Turn off feedback mode">×</button></header>
+      <header class="fp-head"><span class="fp-title">${panelTitle}</span><span class="fp-count">${count}</span><button data-action="collapse" aria-label="Collapse panel">−</button><button data-action="off" aria-label="Turn off review mode">×</button></header>
       <div class="fp-body">
         ${this.warning ? `<div class="fp-warning">${escapeHtml(this.warning)}</div>` : ""}
         <div class="fp-actions">
@@ -851,8 +852,8 @@ class FeedbackController {
     if (!this.root) return;
     const panel = document.createElement("section");
     panel.className = "fp-panel";
-    panel.setAttribute("aria-label", "Feedback Packet error");
-    panel.innerHTML = `<header class="fp-head"><span class="fp-title">Feedback</span><button data-dismiss aria-label="Dismiss error">×</button></header><div class="fp-body"><p class="fp-status error" role="alert">${escapeHtml(userFacingError(error, "Feedback Packet could not start."))}</p></div>`;
+    panel.setAttribute("aria-label", `${extensionDisplayName} error`);
+    panel.innerHTML = `<header class="fp-head"><span class="fp-title">${panelTitle}</span><button data-dismiss aria-label="Dismiss error">×</button></header><div class="fp-body"><p class="fp-status error" role="alert">${escapeHtml(userFacingError(error, `${extensionDisplayName} could not start.`))}</p></div>`;
     panel.querySelector("[data-dismiss]")?.addEventListener("click", () => {
       this.host?.remove();
       this.host = undefined;
@@ -873,13 +874,13 @@ class FeedbackController {
   }
 }
 
-const existingController = window.__feedbackPacketController;
+const existingController = window.__pageReviewController;
 if (!existingController) {
-  document.querySelectorAll("[data-feedback-packet]").forEach((host) => host.remove());
+  document.querySelectorAll("[data-page-review]").forEach((host) => host.remove());
 }
 const controller = existingController ?? new FeedbackController();
-window.__feedbackPacketController = controller;
+window.__pageReviewController = controller;
 void controller.toggle().catch((error) => {
-  console.error("Feedback Packet could not toggle feedback mode.", error);
+  console.error("Page Review could not toggle review mode.", error);
   controller.showActivationError(error);
 });

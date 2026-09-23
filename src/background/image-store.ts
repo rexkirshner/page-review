@@ -1,3 +1,4 @@
+// Keep the original persistent identifier so an upgrade does not orphan locally stored screenshots.
 const DATABASE = "feedback-packet-images";
 const STORE = "screenshots";
 

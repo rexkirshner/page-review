@@ -94,13 +94,13 @@ async function injectContentScript(page: Page, serviceWorker: Worker): Promise<v
   await serviceWorker.evaluate(async ({ targetTabId }) => {
     await chrome.scripting.executeScript({ target: { tabId: targetTabId }, files: ["content.js"] });
   }, { targetTabId: tabId });
-  await expect(page.locator("[data-feedback-packet]")).toHaveCount(1);
+  await expect(page.locator("[data-page-review]")).toHaveCount(1);
 }
 
 test("the built extension completes its critical local workflow", async () => {
-  const temporaryDirectory = await mkdtemp(path.join(tmpdir(), "feedback-packet-e2e-"));
+  const temporaryDirectory = await mkdtemp(path.join(tmpdir(), "page-review-e2e-"));
   const extensionPath = path.join(temporaryDirectory, "extension");
-  await cp(path.resolve("dist"), extensionPath, { recursive: true });
+  await cp(path.resolve("dist/release"), extensionPath, { recursive: true });
   const manifestPath = path.join(extensionPath, "manifest.json");
   const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
   manifest.host_permissions = ["<all_urls>"];
@@ -202,11 +202,11 @@ test("the built extension completes its critical local workflow", async () => {
     await serviceWorker.evaluate(async ({ targetTabId }) => {
       await chrome.scripting.executeScript({
         target: { tabId: targetTabId },
-        func: () => { delete window.__feedbackPacketController; },
+        func: () => { delete window.__pageReviewController; },
       });
     }, { targetTabId: tabId });
     await injectContentScript(page, serviceWorker);
-    expect((await axNodes(session)).filter((node) => node.role?.value === "region" && node.name?.value === "Feedback Packet")).toHaveLength(1);
+    expect((await axNodes(session)).filter((node) => node.role?.value === "region" && node.name?.value === "Page Review")).toHaveLength(1);
 
     await page.reload();
     await injectContentScript(page, serviceWorker);

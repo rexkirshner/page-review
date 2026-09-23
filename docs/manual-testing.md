@@ -18,19 +18,19 @@ Build the extension, load `dist` as an unpacked extension, and serve the fixture
 
 ## Mode and persistence
 
-- [ ] Click the toolbar action while feedback mode is on. Confirm the panel and every marker disappear and ordinary page clicks work.
-- [ ] Turn feedback mode on again without reloading. Confirm the draft returns.
-- [ ] Follow a hash route or trigger client-side history navigation. Confirm feedback mode turns off; turn it on again and confirm the destination page key's draft loads.
-- [ ] Refresh. Confirm feedback mode is off; click the action and confirm the draft returns.
-- [ ] Restart Chrome, reopen the same URL, turn feedback mode on, and confirm the draft returns.
+- [ ] Click the toolbar action while review mode is on. Confirm the panel and every marker disappear and ordinary page clicks work.
+- [ ] Turn review mode on again without reloading. Confirm the draft returns.
+- [ ] Follow a hash route or trigger client-side history navigation. Confirm review mode turns off; turn it on again and confirm the destination page key's draft loads.
+- [ ] Refresh. Confirm review mode is off; click the action and confirm the draft returns.
+- [ ] Restart Chrome, reopen the same URL, turn review mode on, and confirm the draft returns.
 - [ ] Create drafts at `#overview` and `#details`; confirm they remain distinct.
 - [ ] Add `utm_source=test` to one URL and confirm it restores the same draft.
 - [ ] Add a non-tracking query such as `?layout=wide` and confirm it uses a distinct draft.
 
 ## Resolution and retention
 
-- [ ] Select only the initial sentence in the dynamic target and save it. Turn feedback mode off, choose **Replace target**, then turn feedback mode on again. Confirm the original comment is retained and reported as unresolved rather than attached to the replacement text.
-- [ ] Annotate the replacement sentence, turn feedback mode off, choose **Remove target**, then turn feedback mode on again. Confirm both earlier comments remain in the draft and both targets are unresolved.
+- [ ] Select only the initial sentence in the dynamic target and save it. Turn review mode off, choose **Replace target**, then turn review mode on again. Confirm the original comment is retained and reported as unresolved rather than attached to the replacement text.
+- [ ] Annotate the replacement sentence, turn review mode off, choose **Remove target**, then turn review mode on again. Confirm both earlier comments remain in the draft and both targets are unresolved.
 - [ ] Annotate one of the duplicate-text paragraphs, change the DOM path, and confirm the duplicate quote is not used as an ambiguous fallback.
 - [ ] Temporarily seed or edit a draft's `lastEditedAt` in extension storage to exceed the chosen retention period. Load it and confirm the draft and its images are deleted.
 - [ ] Choose 7, 30, 90 days, and never; reload after each and confirm the setting persists.
@@ -65,8 +65,8 @@ Build the extension, load `dist` as an unpacked extension, and serve the fixture
 
 ## Boundaries
 
-- [ ] On `chrome://` and Chrome Web Store pages, confirm the action shows a `!` badge and its title explains that Feedback Packet cannot run there.
-- [ ] Leave feedback mode open on a page, reload the unpacked extension, then click its action on the original page. Confirm the stale panel is replaced and only one Feedback Packet panel remains.
+- [ ] On `chrome://` and Chrome Web Store pages, confirm the action shows a `!` badge and its title explains that Page Review cannot run there.
+- [ ] Leave review mode open on a page, reload the unpacked extension, then click its action on the original page. Confirm the stale panel is replaced and only one Page Review panel remains.
 - [ ] Confirm top-level content remains selectable when a cross-origin iframe is present, but iframe contents are not offered as targets.
 - [ ] Confirm the page-owned shadow-root example is not traversed.
 - [ ] Confirm the canvas can be selected only as an element; pixels or drawn text cannot be selected as DOM content.

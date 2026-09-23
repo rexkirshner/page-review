@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "Feedback Packet",
+  "name": "Page Review",
   "version": "0.1.0",
   "description": "Annotate rendered pages and export comments with evidence that identifies each target.",
   "minimum_chrome_version": "109",
@@ -16,7 +16,7 @@
       "19": "icons/icon19.png",
       "38": "icons/icon38.png"
     },
-    "default_title": "Toggle feedback mode"
+    "default_title": "Toggle Page Review"
   },
   "background": {
     "service_worker": "background.js"

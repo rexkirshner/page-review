@@ -145,7 +145,7 @@ test("settings accept only supported retention values and return independent def
 test("extension reload errors tell the user how to recover", () => {
   assert.equal(
     userFacingError(new Error("Extension context invalidated."), "The action failed."),
-    "The extension was reloaded. Refresh this page and turn feedback mode on again.",
+    "The extension was reloaded. Refresh this page and turn review mode on again.",
   );
   assert.equal(userFacingError(new Error("Storage failed."), "The action failed."), "Storage failed.");
   assert.equal(userFacingError(undefined, "The action failed."), "The action failed.");
