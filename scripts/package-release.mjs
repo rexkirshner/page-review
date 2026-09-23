@@ -37,5 +37,6 @@ for (const required of ["background.js", "content.js", "icons/icon128.png"]) {
 
 await mkdir("release", { recursive: true });
 const filename = `feedback-packet-${manifest.version}.zip`;
-await writeFile(path.join("release", filename), zipSync(Object.fromEntries(files), { level: 9 }));
+const releaseTimestamp = new Date(1980, 0, 1);
+await writeFile(path.join("release", filename), zipSync(Object.fromEntries(files), { level: 9, mtime: releaseTimestamp }));
 console.log(`Created release/${filename} with ${files.length} files.`);
