@@ -89,10 +89,8 @@ No account, payment, special hardware, or external service is required.
 
 ## Homepage, support, and privacy URLs
 
-Recommended after the source is intentionally published:
-
-- Homepage: the public repository README or a stable project page.
-- Support: the public repository's issue tracker with issue creation enabled.
+- Homepage: https://github.com/rexkirshner/page-review
+- Support: https://github.com/rexkirshner/page-review/issues
 - Privacy policy: https://pages.scratchspace.dev/privacy/page-review/
 
-Before submission, replace the dashboard URL placeholders with the final public URLs and confirm each works in a signed-out/private browser window. Do not use the private Forgejo URL.
+These URLs have been confirmed in a signed-out browser. Do not use the private Forgejo URL in the Store listing.
